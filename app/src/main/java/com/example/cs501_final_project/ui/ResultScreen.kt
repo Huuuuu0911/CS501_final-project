@@ -11,6 +11,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.Arrangement
 
 @Composable
 fun ResultScreen(
@@ -19,7 +20,8 @@ fun ResultScreen(
     symptom: String,
     painLevel: Int,
     duration: String,
-    onFindCareClick: () -> Unit
+    onFindCareClick: () -> Unit,
+    onViewHistoryClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -32,7 +34,7 @@ fun ResultScreen(
             style = MaterialTheme.typography.headlineSmall
         )
 
-        // summary card with user input + result
+        // summary card
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -69,20 +71,31 @@ fun ResultScreen(
             modifier = Modifier.padding(top = 20.dp)
         )
 
-        // disclaimer (important for safety)
+        // disclaimer
         Text(
             text = "This app does not provide a medical diagnosis. If symptoms get worse, please seek professional care immediately.",
             modifier = Modifier.padding(top = 16.dp)
         )
 
-        // go to map screen
-        Button(
-            onClick = onFindCareClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 24.dp)
+        Column(
+            modifier = Modifier.padding(top = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Find Nearby Care")
+            // maps button
+            Button(
+                onClick = onFindCareClick,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Find Nearby Care")
+            }
+
+            // history button
+            Button(
+                onClick = onViewHistoryClick,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("View History")
+            }
         }
     }
 }

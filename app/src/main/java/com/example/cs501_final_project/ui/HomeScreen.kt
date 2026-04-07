@@ -14,31 +14,44 @@ import androidx.compose.ui.unit.dp
 
 // simple home screen
 @Composable
-fun HomeScreen(onStartClick: () -> Unit) {
+fun HomeScreen(
+    onStartClick: () -> Unit,
+    onHistoryClick: () -> Unit
+) {
     Column(
-        modifier = Modifier.Companion
+        modifier = Modifier
             .fillMaxSize()
             .padding(16.dp), // basic padding
         verticalArrangement = Arrangement.Center
     ) {
-        // app title
         Text(
             text = "CareRoute",
             style = MaterialTheme.typography.headlineMedium
         )
 
-        // short description
         Text(
             text = "This app helps users choose the right level of care based on simple symptom information.",
-            modifier = Modifier.Companion.padding(vertical = 16.dp)
+            modifier = Modifier.padding(top = 16.dp, bottom = 24.dp)
         )
 
-        // start button
-        Button(
-            onClick = onStartClick,
-            modifier = Modifier.Companion.fillMaxWidth()
+        Column(
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Start Symptom Check")
+            // start button
+            Button(
+                onClick = onStartClick,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Start Symptom Check")
+            }
+
+            // history button
+            Button(
+                onClick = onHistoryClick,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("View History")
+            }
         }
     }
 }

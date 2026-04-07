@@ -7,16 +7,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import com.example.cs501_final_project.navigation.AppNav
 
-// main entry point of the app
+// main entry point
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // set up compose UI
+        // load compose UI
         setContent {
             MaterialTheme {
                 Surface {
-                    AppNav() // load navigation graph
+                    AppNav()
                 }
             }
         }

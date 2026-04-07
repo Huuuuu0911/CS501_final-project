@@ -28,7 +28,7 @@ fun TriageScreen(
             .fillMaxSize()
             .padding(16.dp) // basic layout padding
     ) {
-        // screen title
+        // title
         Text(
             text = "Symptom Check",
             style = MaterialTheme.typography.headlineSmall
@@ -44,13 +44,13 @@ fun TriageScreen(
                 .padding(top = 16.dp)
         )
 
-        // pain level display
+        // pain level text
         Text(
             text = "Pain Level: ${painLevel.toInt()}",
             modifier = Modifier.padding(top = 20.dp, bottom = 8.dp)
         )
 
-        // pain level slider (0–10)
+        // pain slider
         Slider(
             value = painLevel,
             onValueChange = onPainLevelChange,

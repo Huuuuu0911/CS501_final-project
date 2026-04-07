@@ -1,38 +1,52 @@
 package com.example.cs501_final_project.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.cs501_final_project.ui.HistoryScreen
 import com.example.cs501_final_project.ui.HomeScreen
 import com.example.cs501_final_project.ui.MapScreen
 import com.example.cs501_final_project.ui.ResultScreen
 import com.example.cs501_final_project.ui.TriageScreen
 
-// define routes for navigation
+// routes for navigation
 object Routes {
     const val HOME = "home"
     const val TRIAGE = "triage"
     const val RESULT = "result"
     const val MAP = "map"
+    const val HISTORY = "history"
 }
 
 @Composable
 fun AppNav() {
     val navController = rememberNavController()
 
-    // basic states to store user input
-    val symptomState = remember { mutableStateOf("") }
-    val painLevelState = remember { mutableStateOf(5f) }
-    val durationState = remember { mutableStateOf("") }
+    // save input across rotation
+    var symptom by rememberSaveable { mutableStateOf("") }
+    var painLevel by rememberSaveable { mutableStateOf(5f) }
+    var duration by rememberSaveable { mutableStateOf("") }
 
-    // result states
-    val urgencyState = remember { mutableStateOf("Primary Care") }
-    val recommendationState = remember { mutableStateOf("You can start with a primary care visit.") }
+    // save result too
+    var urgency by rememberSaveable { mutableStateOf("") }
+    var recommendation by rememberSaveable { mutableStateOf("") }
 
-    // navigation graph
+    // history list
+    var history by rememberSaveable(
+        stateSaver = listSaver(
+            save = { it },
+            restore = { it.toMutableList() }
+        )
+    ) {
+        mutableStateOf(mutableListOf<String>())
+    }
+
     NavHost(
         navController = navController,
         startDestination = Routes.HOME
@@ -40,28 +54,41 @@ fun AppNav() {
         composable(Routes.HOME) {
             HomeScreen(
                 onStartClick = {
-                    navController.navigate(Routes.TRIAGE) // go to input screen
+                    navController.navigate(Routes.TRIAGE)
+                },
+                onHistoryClick = {
+                    navController.navigate(Routes.HISTORY)
                 }
             )
         }
 
         composable(Routes.TRIAGE) {
             TriageScreen(
-                symptom = symptomState.value,
-                onSymptomChange = { symptomState.value = it }, // update text input
-                painLevel = painLevelState.value,
-                onPainLevelChange = { painLevelState.value = it }, // update slider
-                duration = durationState.value,
-                onDurationChange = { durationState.value = it },
+                symptom = symptom,
+                onSymptomChange = { symptom = it },
+                painLevel = painLevel,
+                onPainLevelChange = { painLevel = it },
+                duration = duration,
+                onDurationChange = { duration = it },
                 onSubmitClick = {
-                    // simple rule-based logic
-                    val result = getTriageResult(
-                        symptom = symptomState.value,
-                        painLevel = painLevelState.value.toInt(),
-                        duration = durationState.value
-                    )
-                    urgencyState.value = result.first
-                    recommendationState.value = result.second
+                    // simple validation
+                    if (symptom.isBlank()) {
+                        urgency = "Input Needed"
+                        recommendation = "Please enter your symptom first."
+                    } else {
+                        val result = getTriageResult(
+                            symptom = symptom,
+                            painLevel = painLevel.toInt(),
+                            duration = duration
+                        )
+
+                        urgency = result.first
+                        recommendation = result.second
+
+                        // save one history item
+                        val item = "Symptom: $symptom | Pain: ${painLevel.toInt()} | Duration: $duration | Result: $urgency"
+                        history = (history + item).toMutableList()
+                    }
 
                     navController.navigate(Routes.RESULT)
                 }
@@ -70,59 +97,67 @@ fun AppNav() {
 
         composable(Routes.RESULT) {
             ResultScreen(
-                urgency = urgencyState.value,
-                recommendation = recommendationState.value,
-                symptom = symptomState.value,
-                painLevel = painLevelState.value.toInt(),
-                duration = durationState.value,
+                urgency = urgency,
+                recommendation = recommendation,
+                symptom = symptom,
+                painLevel = painLevel.toInt(),
+                duration = duration,
                 onFindCareClick = {
-                    navController.navigate(Routes.MAP) // go to nearby care
+                    navController.navigate(Routes.MAP)
+                },
+                onViewHistoryClick = {
+                    navController.navigate(Routes.HISTORY)
                 }
             )
         }
 
         composable(Routes.MAP) {
             MapScreen(
-                urgency = urgencyState.value,
+                urgency = urgency,
                 onBackClick = {
-                    navController.popBackStack() // go back
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Routes.HISTORY) {
+            HistoryScreen(
+                history = history,
+                onBackClick = {
+                    navController.popBackStack()
                 }
             )
         }
     }
 }
 
-// simple triage logic (not real medical advice)
+// simple rule-based logic
 fun getTriageResult(
     symptom: String,
     painLevel: Int,
     duration: String
 ): Pair<String, String> {
     val text = symptom.lowercase()
+    val timeText = duration.lowercase()
 
     return when {
-        // more serious symptoms
-        text.contains("chest") || text.contains("shortness of breath") || painLevel >= 8 -> {
-            Pair(
-                "Emergency",
-                "Your symptoms may need immediate attention. Please go to the ER or call emergency services if they get worse."
-            )
+        text.contains("chest") ||
+                text.contains("shortness of breath") ||
+                text.contains("can’t breathe") ||
+                painLevel >= 8 -> {
+            "Emergency" to "Your symptoms may need immediate attention. Please go to the ER or call emergency services if things get worse."
         }
 
-        // medium level
-        text.contains("fever") || text.contains("vomit") || text.contains("infection") || painLevel >= 5 -> {
-            Pair(
-                "Urgent Care",
-                "Your symptoms may need same-day care. An urgent care clinic is a good next step."
-            )
+        text.contains("fever") ||
+                text.contains("vomit") ||
+                text.contains("infection") ||
+                painLevel >= 5 ||
+                timeText.contains("day") -> {
+            "Urgent Care" to "Your symptoms may need same-day care. Urgent care is a reasonable next step."
         }
 
-        // default case
         else -> {
-            Pair(
-                "Primary Care",
-                "Your symptoms seem less urgent. You can start with a primary care visit."
-            )
+            "Primary Care" to "Your symptoms seem less urgent. You can start with a regular doctor visit."
         }
     }
 }
