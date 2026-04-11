@@ -8,23 +8,23 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.example.cs501_final_project.ui.components.AppButton
+import com.example.cs501_final_project.ui.components.AppCard
 
 @Composable
 fun TriageScreen(
@@ -39,10 +39,10 @@ fun TriageScreen(
 ) {
     val context = LocalContext.current
 
-    // local message for permission / recognition errors
+    // Local message for permission or recognition result
     var voiceStatusText by remember { mutableStateOf("") }
 
-    // launcher for Android speech recognition activity
+    // Launcher for Android speech recognition
     val speechLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -61,7 +61,7 @@ fun TriageScreen(
         }
     }
 
-    // runtime permission request for microphone
+    // Runtime permission request for microphone
     val audioPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -84,79 +84,106 @@ fun TriageScreen(
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        // screen title
+        // Screen title
         Text(
             text = "Symptom Check",
-            style = MaterialTheme.typography.headlineSmall
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        // symptom input
-        OutlinedTextField(
-            value = symptom,
-            onValueChange = onSymptomChange,
-            label = { Text("Describe your symptom") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 16.dp)
-        )
-
-        // voice input button
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Button(
-                onClick = {
-                    audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                }
+        // Symptom input card
+        AppCard {
+            Column(
+                modifier = Modifier.padding(16.dp)
             ) {
-                Text("Use Voice Input")
+                Text(
+                    text = "Describe Your Symptom",
+                    style = MaterialTheme.typography.titleMedium
+                )
+
+                OutlinedTextField(
+                    value = symptom,
+                    onValueChange = onSymptomChange,
+                    label = { Text("Type your symptom here") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp)
+                )
+
+                AppButton(
+                    text = "Use Voice Input",
+                    onClick = {
+                        audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                )
+
+                if (voiceStatusText.isNotBlank()) {
+                    Text(
+                        text = voiceStatusText,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
             }
         }
 
-        // message under voice button
-        if (voiceStatusText.isNotBlank()) {
-            Text(
-                text = voiceStatusText,
-                modifier = Modifier.padding(top = 8.dp)
-            )
+        // Pain level card
+        AppCard {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Text(
+                    text = "Pain Level",
+                    style = MaterialTheme.typography.titleMedium
+                )
+
+                Text(
+                    text = painLevel.toInt().toString(),
+                    style = MaterialTheme.typography.headlineMedium,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+                )
+
+                Slider(
+                    value = painLevel,
+                    onValueChange = onPainLevelChange,
+                    valueRange = 0f..10f,
+                    steps = 9,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
 
-        // pain level label
-        Text(
-            text = "Pain Level: ${painLevel.toInt()}",
-            modifier = Modifier.padding(top = 20.dp, bottom = 8.dp)
-        )
+        // Duration card
+        AppCard {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Text(
+                    text = "Duration",
+                    style = MaterialTheme.typography.titleMedium
+                )
 
-        // pain slider
-        Slider(
-            value = painLevel,
-            onValueChange = onPainLevelChange,
-            valueRange = 0f..10f,
-            steps = 9,
-            modifier = Modifier.fillMaxWidth()
-        )
+                OutlinedTextField(
+                    value = duration,
+                    onValueChange = onDurationChange,
+                    label = { Text("How long have you had this symptom?") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp)
+                )
+            }
+        }
 
-        // duration input
-        OutlinedTextField(
-            value = duration,
-            onValueChange = onDurationChange,
-            label = { Text("How long have you had this symptom?") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 20.dp)
-        )
-
-        // submit button
-        Button(
-            onClick = onSubmitClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 24.dp)
-        ) {
-            Text("See Result")
+        // Submit card
+        AppCard {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                AppButton(
+                    text = "See Result",
+                    onClick = onSubmitClick
+                )
+            }
         }
     }
 }
