@@ -9,11 +9,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun AppCard(content: @Composable () -> Unit) {
+fun AppCard(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
     Card(
+        modifier = modifier.padding(8.dp),
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(6.dp),
-        modifier = Modifier.padding(8.dp)
+        elevation = CardDefaults.cardElevation(6.dp)
     ) {
         content()
     }
