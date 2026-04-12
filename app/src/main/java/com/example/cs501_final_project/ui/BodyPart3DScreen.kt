@@ -6,20 +6,32 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.cs501_final_project.ui.components.AppCard
@@ -39,100 +51,241 @@ fun BodyPart3DScreen(
     val modelLoader = rememberModelLoader(engine)
     val rotationY = remember { mutableFloatStateOf(0f) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        Text(
-            text = "3D Body Viewer",
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(bottom = 16.dp)
+    val bgColor = Color(0xFFF6F8FC)
+    val headerGradient = Brush.horizontalGradient(
+        colors = listOf(
+            Color(0xFF5B8DEF),
+            Color(0xFF7B61FF)
         )
+    )
 
-        // Model area
-        AppCard(
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = bgColor
+    ) {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(320.dp)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 18.dp, vertical = 18.dp)
+                .navigationBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+
+            // Header
             Box(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        brush = headerGradient,
+                        shape = RoundedCornerShape(28.dp)
+                    )
+                    .padding(22.dp)
             ) {
-                SceneView(
-                    modifier = Modifier.fillMaxSize(),
-                    engine = engine,
-                    modelLoader = modelLoader
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    rememberModelInstance(
-                        modelLoader = modelLoader,
-                        assetFileLocation = "models/male_model.glb"
-                    )?.let { modelInstance ->
-                        ModelNode(
-                            modelInstance = modelInstance,
-                            scaleToUnits = 0.68f,
-                            rotation = Rotation(y = rotationY.floatValue)
-                        )
+                    Text(
+                        text = "Body Area Check",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Color.White
+                    )
+
+                    Text(
+                        text = "Rotate the model and choose the body area you want to describe.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.92f)
+                    )
+                }
+            }
+
+            // Model section
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(26.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "3D Body Viewer",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+
+                    Text(
+                        text = "Use the buttons below to rotate the model. Body area selection can be added next.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF666A73)
+                    )
+
+                    AppCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(340.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            SceneView(
+                                modifier = Modifier.fillMaxSize(),
+                                engine = engine,
+                                modelLoader = modelLoader
+                            ) {
+                                rememberModelInstance(
+                                    modelLoader = modelLoader,
+                                    assetFileLocation = "models/male_model.glb"
+                                )?.let { modelInstance ->
+                                    ModelNode(
+                                        modelInstance = modelInstance,
+                                        scaleToUnits = 0.68f,
+                                        rotation = Rotation(y = rotationY.floatValue)
+                                    )
+                                }
+                            }
+
+                            // block touch on model area for now
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Transparent)
+                                    .clickable(enabled = true, onClick = {})
+                            )
+                        }
                     }
                 }
-
-                // Transparent overlay to block touch interaction
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Transparent)
-                        .clickable(enabled = true, onClick = {})
-                )
-            }
-        }
-
-        // Space area
-        AppCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(top = 16.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.Top
-            ) {
-                Text(
-                    text = "Please tap the body area in the image.",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-
-                Text(
-                    text = "This section can later show detailed questions for the selected body area.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(top = 12.dp)
-                )
-            }
-        }
-
-        // Small button area at the very bottom
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 12.dp)
-                .navigationBarsPadding(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Button(
-                onClick = { rotationY.floatValue += 15f },
-                modifier = Modifier.sizeIn(minWidth = 120.dp)
-            ) {
-                Text("Rotate Left")
             }
 
-            Button(
-                onClick = { rotationY.floatValue -= 15f },
-                modifier = Modifier.sizeIn(minWidth = 120.dp)
+            // Rotation controls
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
-                Text("Rotate Right")
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Model Controls",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = { rotationY.floatValue += 15f },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(50.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF5B8DEF)
+                            )
+                        ) {
+                            Text("Rotate Left")
+                        }
+
+                        Button(
+                            onClick = { rotationY.floatValue -= 15f },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(50.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF7B61FF)
+                            )
+                        ) {
+                            Text("Rotate Right")
+                        }
+                    }
+                }
+            }
+
+            // Small guide section
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "How to use",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+
+                    HorizontalDivider(color = Color(0xFFE8EAF0))
+
+                    Text(
+                        text = "1. Rotate the model left or right.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    Text(
+                        text = "2. Choose the body area you want to check.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    Text(
+                        text = "3. The assistant section below can later show follow-up questions and suggestions.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+
+            // Assistant / Gemini reserved area
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Assistant Panel",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+
+                    HorizontalDivider(color = Color(0xFFE8EAF0))
+
+                    Text(
+                        text = "Selected Area",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color(0xFF4F8EEB)
+                    )
+
+                    Text(
+                        text = "None selected yet",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF666A73)
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "Diagnosis Area",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color(0xFF7B61FF)
+                    )
+
+                    Text(
+                        text = "This section is reserved for Gemini-based follow-up questions and care suggestions after a body part is selected.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF666A73)
+                    )
+                }
             }
         }
     }
