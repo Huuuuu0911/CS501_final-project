@@ -41,6 +41,14 @@ import io.github.sceneview.node.ModelNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import com.example.cs501_final_project.data.GeminiRepository
+import kotlinx.coroutines.launch
 
 @Composable
 fun BodyPart3DScreen(
@@ -50,6 +58,15 @@ fun BodyPart3DScreen(
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val rotationY = remember { mutableFloatStateOf(0f) }
+
+    val repository = remember { GeminiRepository() }
+    val scope = rememberCoroutineScope()
+
+    var symptomText by remember { mutableStateOf("") }
+    var assistantResponse by remember { mutableStateOf("No response yet.") }
+    var isLoading by remember { mutableStateOf(false) }
+
+    val selectedBodyPart = "General"
 
     val bgColor = Color(0xFFF6F8FC)
     val headerGradient = Brush.horizontalGradient(
@@ -242,7 +259,7 @@ fun BodyPart3DScreen(
                 }
             }
 
-            // Assistant / Gemini reserved area
+            // Assistant Panel (REAL Gemini)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
@@ -253,37 +270,66 @@ fun BodyPart3DScreen(
                     modifier = Modifier.padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+
                     Text(
-                        text = "Assistant Panel",
+                        text = "Assistant",
                         style = MaterialTheme.typography.titleMedium
                     )
 
                     HorizontalDivider(color = Color(0xFFE8EAF0))
 
                     Text(
-                        text = "Selected Area",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color(0xFF4F8EEB)
+                        text = "Describe your symptom",
+                        style = MaterialTheme.typography.bodyMedium
                     )
 
+                    OutlinedTextField(
+                        value = symptomText,
+                        onValueChange = { symptomText = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("e.g. I feel sharp pain in my chest") },
+                        shape = RoundedCornerShape(14.dp)
+                    )
+
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                isLoading = true
+                                assistantResponse = "Loading..."
+
+                                try {
+                                    val result = repository.askGemini(
+                                        bodyPart = selectedBodyPart,
+                                        symptomText = symptomText,
+                                        age = "21",
+                                        gender = "Female",
+                                        height = "5'6\"",
+                                        weight = "130",
+                                        address = "Boston, MA"
+                                    )
+                                    assistantResponse = result
+                                } catch (e: Exception) {
+                                    assistantResponse = "Error: ${e::class.java.simpleName}: ${e.message}"
+                                    e.printStackTrace()
+                                }
+
+                                isLoading = false
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = symptomText.isNotBlank()
+                    ) {
+                        Text("Ask Assistant")
+                    }
+
+                    if (isLoading) {
+                        CircularProgressIndicator()
+                    }
+
                     Text(
-                        text = "None selected yet",
+                        text = assistantResponse,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF666A73)
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Text(
-                        text = "Diagnosis Area",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color(0xFF7B61FF)
-                    )
-
-                    Text(
-                        text = "This section is reserved for Gemini-based follow-up questions and care suggestions after a body part is selected.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF666A73)
+                        color = Color(0xFF44474F)
                     )
                 }
             }
