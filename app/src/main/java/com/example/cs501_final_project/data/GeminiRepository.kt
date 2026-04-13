@@ -9,6 +9,7 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.HttpException
 
 class GeminiRepository {
 
@@ -70,17 +71,30 @@ class GeminiRepository {
             )
         )
 
-        val response = api.generateContent(
-            apiKey = BuildConfig.GEMINI_API_KEY,
-            request = request
-        )
+        try {
+            val response = api.generateContent(
+                apiKey = BuildConfig.GEMINI_API_KEY,
+                request = request
+            )
 
-        return response.candidates
-            ?.firstOrNull()
-            ?.content
-            ?.parts
-            ?.firstOrNull()
-            ?.text
-            ?: "No response from Gemini."
+            return response.candidates
+                ?.firstOrNull()
+                ?.content
+                ?.parts
+                ?.firstOrNull()
+                ?.text
+                ?: "No response from Gemini"
+
+        } catch (e: HttpException) {
+            val response = e.response()
+            val statusCode = response?.code()
+            val errorBody = response?.errorBody()?.string()
+            e.printStackTrace()
+            return "HTTP $statusCode: $errorBody"
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return "Error: ${e.javaClass.simpleName}: ${e.message}"
+        }
     }
 }
