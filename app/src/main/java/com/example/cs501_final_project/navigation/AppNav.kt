@@ -151,7 +151,13 @@ fun AppNav() {
                 )
             }
 
-
+            composable(
+                route = "follow_up/{part}/{symptomText}/{painLevel}",
+                arguments = listOf(
+                    navArgument("part") { type = NavType.StringType },
+                    navArgument("symptomText") { type = NavType.StringType },
+                    navArgument("painLevel") { type = NavType.IntType }
+                )
             ) { backStackEntry ->
                 val part = backStackEntry.arguments?.getString("part") ?: ""
                 val symptomText = backStackEntry.arguments?.getString("symptomText") ?: ""
