@@ -1,356 +1,285 @@
 package com.example.cs501_final_project.ui
 
-import android.Manifest
-import android.annotation.SuppressLint
-import android.location.Location
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocalHospital
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Medication
+import androidx.compose.material.icons.filled.MedicalServices
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.cs501_final_project.BuildConfig
-import com.example.cs501_final_project.ui.components.AppButton
-import com.example.cs501_final_project.ui.components.AppCard
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.libraries.places.api.Places
-import com.google.android.libraries.places.api.model.CircularBounds
-import com.google.android.libraries.places.api.model.Place
-import com.google.android.libraries.places.api.model.RectangularBounds
-import com.google.android.libraries.places.api.net.PlacesClient
-import com.google.android.libraries.places.api.net.SearchByTextRequest
-import com.google.android.libraries.places.api.net.SearchNearbyRequest
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.MarkerState
-import com.google.maps.android.compose.rememberCameraPositionState
 
-data class CarePlace(
-    val name: String,
-    val address: String,
-    val latLng: LatLng,
-    val distanceMeters: Float
-)
-
-@SuppressLint("MissingPermission")
 @Composable
-fun MapScreen(
-    urgency: String,
-    onBackClick: () -> Unit
-) {
+fun MapScreen() {
     val context = LocalContext.current
-    val fusedLocationClient = remember {
-        LocationServices.getFusedLocationProviderClient(context)
+    val bgColor = Color(0xFFF6F8FC)
+    var searchText by rememberSaveable { mutableStateOf("") }
+    var selectedCategory by rememberSaveable { mutableStateOf("Hospital") }
+
+    fun openMapQuery(query: String) {
+        val intent = Intent(
+            Intent.ACTION_VIEW,
+            Uri.parse("geo:0,0?q=${Uri.encode(query)}")
+        )
+        context.startActivity(intent)
     }
 
-    if (!Places.isInitialized()) {
-        Places.initializeWithNewPlacesApiEnabled(context, BuildConfig.MAPS_API_KEY)
+    val quickCategories = remember {
+        listOf("Hospital", "Pharmacy", "Urgent Care", "Checkup Center")
     }
 
-    val placesClient: PlacesClient = remember { Places.createClient(context) }
+    val highlightGradient = Brush.horizontalGradient(
+        colors = listOf(
+            Color(0xFFEEF9FF),
+            Color(0xFFF3F0FF)
+        )
+    )
 
-    var userLocation by remember { mutableStateOf<LatLng?>(null) }
-    var errorText by remember { mutableStateOf("") }
-    val placesList = remember { mutableStateListOf<CarePlace>() }
-
-    val cameraState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(LatLng(42.36, -71.05), 12f)
-    }
-
-    val recommendationTitle = when (urgency) {
-        "Emergency" -> "Emergency Care Recommended"
-        "Urgent Care" -> "Urgent Care Recommended"
-        else -> "Primary Care Recommended"
-    }
-
-    val recommendationText = when (urgency) {
-        "Emergency" ->
-            "Your result suggests that you may need emergency medical attention. Please go to the nearest hospital or emergency room as soon as possible."
-        "Urgent Care" ->
-            "Your symptoms may need treatment today. An urgent care clinic may be a good option nearby."
-        else ->
-            "Your symptoms seem less severe. A primary care clinic may be the best next step."
-    }
-
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            fusedLocationClient.lastLocation.addOnSuccessListener { loc ->
-                if (loc != null) {
-                    val latLng = LatLng(loc.latitude, loc.longitude)
-                    userLocation = latLng
-                    cameraState.position = CameraPosition.fromLatLngZoom(latLng, 13f)
-
-                    searchPlaces(
-                        urgency = urgency,
-                        user = latLng,
-                        client = placesClient,
-                        onResult = { results ->
-                            placesList.clear()
-                            placesList.addAll(results.take(3))
-                        },
-                        onError = { msg ->
-                            errorText = msg
-                        }
-                    )
-                } else {
-                    errorText = "Could not get current location."
-                }
-            }.addOnFailureListener {
-                errorText = "Location request failed."
-            }
-        } else {
-            errorText = "Location permission denied."
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        launcher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = bgColor
     ) {
-        // Screen title
-        Text(
-            text = "Nearby Care",
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        // Recommendation card
-        AppCard {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 18.dp, vertical = 18.dp)
+                .navigationBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = recommendationTitle,
-                    style = MaterialTheme.typography.titleMedium
+                    text = "Map",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFF111827)
                 )
-
                 Text(
-                    text = recommendationText,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-
-                Text(
-                    text = "Recommended level: $urgency",
-                    modifier = Modifier.padding(top = 12.dp),
-                    style = MaterialTheme.typography.bodyMedium
+                    text = "Search nearby pharmacies, hospitals, urgent care, and checkup centers.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFF667085)
                 )
             }
-        }
 
-        // Status or error card
-        AppCard {
-            Column(
-                modifier = Modifier.padding(16.dp)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
             ) {
-                Text(
-                    text = "Search Status",
-                    style = MaterialTheme.typography.titleMedium
-                )
-
-                val statusText = when {
-                    errorText.isNotBlank() -> errorText
-                    placesList.isEmpty() -> "Looking for nearby care options..."
-                    else -> "Nearby places found."
-                }
-
-                Text(
-                    text = statusText,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-            }
-        }
-
-        // Map card
-        AppCard {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
-                GoogleMap(
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(250.dp),
-                    cameraPositionState = cameraState
+                        .background(highlightGradient)
+                        .padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    userLocation?.let {
-                        Marker(
-                            state = MarkerState(position = it),
-                            title = "Your Location"
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            tint = Color(0xFF4F8EEB)
+                        )
+                        Text(
+                            text = "Nearby Search",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
                         )
                     }
 
-                    placesList.forEach { place ->
-                        Marker(
-                            state = MarkerState(position = place.latLng),
-                            title = place.name
-                        )
-                    }
-                }
-            }
-        }
+                    OutlinedTextField(
+                        value = searchText,
+                        onValueChange = { searchText = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Search keyword") },
+                        placeholder = { Text("e.g. 24 hour pharmacy, urgent care, pediatric clinic") },
+                        shape = RoundedCornerShape(18.dp),
+                        singleLine = true
+                    )
 
-        // Nearby places card
-        AppCard {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
-                Text(
-                    text = "Nearby Options",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-
-                LazyColumn(
-                    modifier = Modifier.weight(1f, fill = false),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(placesList) { place ->
-                        AppCard {
-                            Column(
-                                modifier = Modifier.padding(12.dp)
-                            ) {
-                                Text(
-                                    text = place.name,
-                                    style = MaterialTheme.typography.titleMedium
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        quickCategories.forEach { category ->
+                            FilterChip(
+                                selected = selectedCategory == category,
+                                onClick = { selectedCategory = category },
+                                label = { Text(category) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Color(0xFFE6F4EA),
+                                    selectedLabelColor = Color(0xFF067647),
+                                    containerColor = Color.White,
+                                    labelColor = Color(0xFF48556A)
                                 )
-
-                                Text(
-                                    text = place.address,
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
-
-                                Text(
-                                    text = "${"%.2f".format(place.distanceMeters / 1000f)} km away",
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
-                            }
+                            )
                         }
                     }
+
+                    Button(
+                        onClick = {
+                            val query = if (searchText.isBlank()) {
+                                "$selectedCategory near me"
+                            } else {
+                                "$searchText near me"
+                            }
+                            openMapQuery(query)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(54.dp),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF12B76A))
+                    ) {
+                        Text("Open Nearby Search")
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                QuickMapCard(
+                    modifier = Modifier.weight(1f),
+                    title = "Hospitals",
+                    subtitle = "Emergency and general care",
+                    icon = Icons.Default.LocalHospital,
+                    accent = Color(0xFF4F8EEB),
+                    onClick = { openMapQuery("hospital near me") }
+                )
+                QuickMapCard(
+                    modifier = Modifier.weight(1f),
+                    title = "Pharmacy",
+                    subtitle = "Prescription and OTC help",
+                    icon = Icons.Default.Medication,
+                    accent = Color(0xFF7B61FF),
+                    onClick = { openMapQuery("pharmacy near me") }
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                QuickMapCard(
+                    modifier = Modifier.weight(1f),
+                    title = "Urgent Care",
+                    subtitle = "Faster walk-in options",
+                    icon = Icons.Default.MedicalServices,
+                    accent = Color(0xFFF79009),
+                    onClick = { openMapQuery("urgent care near me") }
+                )
+                QuickMapCard(
+                    modifier = Modifier.weight(1f),
+                    title = "Checkup Center",
+                    subtitle = "Routine screening visits",
+                    icon = Icons.Default.Place,
+                    accent = Color(0xFF12B76A),
+                    onClick = { openMapQuery("checkup center near me") }
+                )
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.Map,
+                            contentDescription = null,
+                            tint = Color(0xFF12B76A)
+                        )
+                        Text(
+                            text = "Smart Ideas",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Text(
+                        text = "You can later expand this page with clinic ratings, insurance filters, open-now status, pediatric search, and saved favorite hospitals.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF667085)
+                    )
                 }
             }
         }
-
-        // Action buttons card
-        AppCard {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                AppButton(
-                    text = "Back",
-                    onClick = onBackClick
-                )
-            }
-        }
     }
 }
 
-private fun searchPlaces(
-    urgency: String,
-    user: LatLng,
-    client: PlacesClient,
-    onResult: (List<CarePlace>) -> Unit,
-    onError: (String) -> Unit
+@Composable
+private fun QuickMapCard(
+    modifier: Modifier = Modifier,
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    accent: Color,
+    onClick: () -> Unit
 ) {
-    val fields = listOf(
-        Place.Field.DISPLAY_NAME,
-        Place.Field.FORMATTED_ADDRESS,
-        Place.Field.LOCATION
-    )
-
-    if (urgency == "Emergency") {
-        val request = SearchNearbyRequest.builder(
-            CircularBounds.newInstance(user, 8000.0),
-            fields
-        )
-            .setIncludedTypes(listOf("hospital"))
-            .build()
-
-        client.searchNearby(request)
-            .addOnSuccessListener { res ->
-                val list = res.places.mapNotNull { place ->
-                    val loc = place.location ?: return@mapNotNull null
-                    CarePlace(
-                        name = place.displayName ?: "",
-                        address = place.formattedAddress ?: "",
-                        latLng = LatLng(loc.latitude, loc.longitude),
-                        distanceMeters = distance(user, LatLng(loc.latitude, loc.longitude))
-                    )
-                }.sortedBy { it.distanceMeters }
-
-                onResult(list)
-            }
-            .addOnFailureListener {
-                onError("Nearby hospital search failed.")
-            }
-    } else {
-        val query = if (urgency == "Urgent Care") {
-            "urgent care"
-        } else {
-            "primary care"
-        }
-
-        val request = SearchByTextRequest.builder(query, fields)
-            .setLocationRestriction(
-                RectangularBounds.newInstance(
-                    LatLng(user.latitude - 0.1, user.longitude - 0.1),
-                    LatLng(user.latitude + 0.1, user.longitude + 0.1)
-                )
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        onClick = onClick
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = accent
             )
-            .build()
-
-        client.searchByText(request)
-            .addOnSuccessListener { res ->
-                val list = res.places.mapNotNull { place ->
-                    val loc = place.location ?: return@mapNotNull null
-                    CarePlace(
-                        name = place.displayName ?: "",
-                        address = place.formattedAddress ?: "",
-                        latLng = LatLng(loc.latitude, loc.longitude),
-                        distanceMeters = distance(user, LatLng(loc.latitude, loc.longitude))
-                    )
-                }.sortedBy { it.distanceMeters }
-
-                onResult(list)
-            }
-            .addOnFailureListener {
-                onError("Text search failed.")
-            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF667085)
+            )
+        }
     }
-}
-
-private fun distance(a: LatLng, b: LatLng): Float {
-    val result = FloatArray(1)
-    Location.distanceBetween(
-        a.latitude,
-        a.longitude,
-        b.latitude,
-        b.longitude,
-        result
-    )
-    return result[0]
 }

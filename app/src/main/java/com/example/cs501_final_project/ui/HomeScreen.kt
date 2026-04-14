@@ -1,6 +1,9 @@
 package com.example.cs501_final_project.ui
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,13 +21,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LocalHospital
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MedicalServices
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.TipsAndUpdates
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -32,179 +39,67 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import java.util.Calendar
 
 @Composable
 fun HomeScreen(
     onStartClick: () -> Unit,
-    onHistoryClick: () -> Unit
+    onHistoryClick: () -> Unit,
+    onMapClick: () -> Unit,
+    onSettingClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val bgColor = Color(0xFFF6F8FC)
+
+    val titleGradient = Brush.horizontalGradient(
+        colors = listOf(
+            Color(0xFF4F8EEB),
+            Color(0xFF7B61FF)
+        )
+    )
+
     val heroGradient = Brush.horizontalGradient(
         colors = listOf(
-            Color(0xFF5B8DEF),
-            Color(0xFF7B61FF),
-            Color(0xFF9C6BFF)
-        )
-    )
-
-    val startCardGradient = Brush.horizontalGradient(
-        colors = listOf(
             Color(0xFFEEF4FF),
-            Color(0xFFF5EEFF)
+            Color(0xFFF4EEFF),
+            Color(0xFFFDF3FF)
         )
     )
 
-    val quickCardColor = Color.White
-    val emergencyBg = Color(0xFFFFF1F1)
-    val emergencyAccent = Color(0xFFE53935)
-
-    var showEditDialog by rememberSaveable { mutableStateOf(false) }
-
-    var name by rememberSaveable { mutableStateOf("") }
-    var phone by rememberSaveable { mutableStateOf("") }
-    var gender by rememberSaveable { mutableStateOf("") }
-    var height by rememberSaveable { mutableStateOf("") }
-    var weight by rememberSaveable { mutableStateOf("") }
-    var age by rememberSaveable { mutableStateOf("") }
-    var address by rememberSaveable { mutableStateOf("") }
-
-    if (showEditDialog) {
-        var tempName by remember { mutableStateOf(name) }
-        var tempPhone by remember { mutableStateOf(phone) }
-        var tempGender by remember { mutableStateOf(gender) }
-        var tempHeight by remember { mutableStateOf(height) }
-        var tempWeight by remember { mutableStateOf(weight) }
-        var tempAge by remember { mutableStateOf(age) }
-        var tempAddress by remember { mutableStateOf(address) }
-
-        AlertDialog(
-            onDismissRequest = { showEditDialog = false },
-            title = {
-                Text(
-                    text = "Edit Personal Information",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedTextField(
-                        value = tempName,
-                        onValueChange = { tempName = it },
-                        label = { Text("Name") },
-                        placeholder = { Text("e.g. John Smith") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        singleLine = true
-                    )
-
-                    OutlinedTextField(
-                        value = tempPhone,
-                        onValueChange = { tempPhone = it },
-                        label = { Text("Phone") },
-                        placeholder = { Text("e.g. (617) 555-1234") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        singleLine = true
-                    )
-
-                    OutlinedTextField(
-                        value = tempGender,
-                        onValueChange = { tempGender = it },
-                        label = { Text("Gender") },
-                        placeholder = { Text("e.g. Male / Female") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        singleLine = true
-                    )
-
-                    OutlinedTextField(
-                        value = tempHeight,
-                        onValueChange = { tempHeight = it },
-                        label = { Text("Height (ft/in)") },
-                        placeholder = { Text("e.g. 5'10\"") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        singleLine = true
-                    )
-
-                    OutlinedTextField(
-                        value = tempWeight,
-                        onValueChange = { tempWeight = it },
-                        label = { Text("Weight (lbs)") },
-                        placeholder = { Text("e.g. 150") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        singleLine = true
-                    )
-
-                    OutlinedTextField(
-                        value = tempAge,
-                        onValueChange = { tempAge = it },
-                        label = { Text("Age (years)") },
-                        placeholder = { Text("e.g. 21") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        singleLine = true
-                    )
-
-                    OutlinedTextField(
-                        value = tempAddress,
-                        onValueChange = { tempAddress = it },
-                        label = { Text("Address") },
-                        placeholder = { Text("e.g. 123 Main St, Boston, MA 02115") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        singleLine = true
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        name = tempName
-                        phone = tempPhone
-                        gender = tempGender
-                        height = tempHeight
-                        weight = tempWeight
-                        age = tempAge
-                        address = tempAddress
-                        showEditDialog = false
-                    },
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Save")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showEditDialog = false }
-                ) {
-                    Text("Cancel")
-                }
-            },
-            shape = RoundedCornerShape(24.dp)
+    val familyGradient = Brush.horizontalGradient(
+        colors = listOf(
+            Color(0xFFEEF9FF),
+            Color(0xFFF2F4FF)
         )
-    }
+    )
+
+    val suggestionGradient = Brush.horizontalGradient(
+        colors = listOf(
+            Color(0xFFF8FAFD),
+            Color(0xFFF7F2FF)
+        )
+    )
+
+    val dailyTips = listOf(
+        "Drink water regularly and note exactly when a symptom starts.",
+        "Take a photo of swelling, rash, or bruising so changes are easier to compare.",
+        "If pain changes with movement, write down which movement makes it worse.",
+        "Keep a short medication list ready for appointments or urgent visits.",
+        "For fever or stomach issues, record food intake and temperature changes."
+    )
+    val tipOfDay = dailyTips[Calendar.getInstance().get(Calendar.DAY_OF_YEAR) % dailyTips.size]
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -218,79 +113,65 @@ fun HomeScreen(
                 .navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(heroGradient)
-                    .padding(22.dp)
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(CircleShape)
+                            .background(titleGradient),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(46.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.18f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.LocalHospital,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-
-                        Column {
-                            Text(
-                                text = "CareRoute",
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            Text(
-                                text = "Smart symptom guidance",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White.copy(alpha = 0.9f)
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.LocalHospital,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(26.dp)
+                        )
                     }
 
-                    Text(
-                        text = "Check symptoms, view past results, and get simple care suggestions in one place.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.95f)
-                    )
+                    Column {
+                        Text(
+                            text = "CareRoute",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFF111827)
+                        )
+                        Text(
+                            text = "Symptom guidance, family care, and nearby help in one place.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF667085)
+                        )
+                    }
                 }
             }
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(26.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                shape = RoundedCornerShape(30.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.Transparent)
             ) {
                 Box(
                     modifier = Modifier
-                        .background(startCardGradient)
-                        .padding(20.dp)
+                        .background(heroGradient)
+                        .padding(22.dp)
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(42.dp)
+                                    .size(48.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFF5B8DEF)),
+                                    .background(Color(0xFF4F8EEB)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
@@ -304,35 +185,35 @@ fun HomeScreen(
                                 Text(
                                     text = "Start Symptom Check",
                                     style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF111827)
                                 )
-
                                 Text(
-                                    text = "Answer a few questions to begin",
+                                    text = "Jump into the 3D body viewer and begin the main symptom flow.",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = Color(0xFF666A73)
+                                    color = Color(0xFF667085)
                                 )
                             }
                         }
 
                         Text(
-                            text = "This check helps you organize symptoms and gives a simple suggestion for the next step.",
+                            text = "This is your main action. Tap below to open the body model, select the painful area, and continue the check.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF44474F)
+                            color = Color(0xFF344054)
                         )
 
                         Button(
                             onClick = onStartClick,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(54.dp),
+                                .height(56.dp),
                             shape = RoundedCornerShape(18.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFF4F8EEB)
                             )
                         ) {
                             Text(
-                                text = "Begin Check",
+                                text = "Begin Symptom Check",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -352,61 +233,18 @@ fun HomeScreen(
             ) {
                 Card(
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(22.dp),
-                    colors = CardDefaults.cardColors(containerColor = quickCardColor),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.History,
+                            imageVector = Icons.Default.TipsAndUpdates,
                             contentDescription = null,
                             tint = Color(0xFF7B61FF)
-                        )
-
-                        Text(
-                            text = "History",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        Text(
-                            text = "See past checks",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF666A73)
-                        )
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Button(
-                            onClick = onHistoryClick,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF7B61FF)
-                            )
-                        ) {
-                            Text("Open")
-                        }
-                    }
-                }
-
-                Card(
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(22.dp),
-                    colors = CardDefaults.cardColors(containerColor = quickCardColor),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Favorite,
-                            contentDescription = null,
-                            tint = Color(0xFFEF6C57)
                         )
 
                         Text(
@@ -416,17 +254,103 @@ fun HomeScreen(
                         )
 
                         Text(
-                            text = "Drink water and track when symptoms begin.",
+                            text = tipOfDay,
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF666A73)
+                            color = Color(0xFF667085)
+                        )
+                    }
+                }
+
+                Card(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .background(familyGradient)
+                            .padding(16.dp)
+                    ) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Groups,
+                                contentDescription = null,
+                                tint = Color(0xFF12B76A)
+                            )
+
+                            Text(
+                                text = "Family Hub",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Text(
+                                text = "Manage family members, keep their history together, and prepare future shared care reminders.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF667085)
+                            )
+
+                            TextButton(
+                                onClick = onSettingClick,
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                            ) {
+                                Text("Manage family")
+                            }
+                        }
+                    }
+                }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(26.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .background(suggestionGradient)
+                        .padding(18.dp)
+                ) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Verified,
+                                contentDescription = null,
+                                tint = Color(0xFF4F8EEB)
+                            )
+                            Text(
+                                text = "Suggested Checkup Focus",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Text(
+                            text = "This area can later become personalized using your own and your family’s symptom history. For now, here is a smart starter layout.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF667085)
                         )
 
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(40.dp)
+                        SuggestionItem(
+                            title = "Annual physical + blood pressure",
+                            subtitle = "Good default baseline for most users and useful before symptoms build up."
+                        )
+                        SuggestionItem(
+                            title = "Medication review",
+                            subtitle = "Especially useful if several family members track recurring symptoms."
+                        )
+                        SuggestionItem(
+                            title = "Muscle / posture check",
+                            subtitle = "Helpful when history shows repeated shoulder, neck, or back complaints."
                         )
                     }
                 }
@@ -434,8 +358,58 @@ fun HomeScreen(
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(26.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text(
+                        text = "Quick Access",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        QuickAccessCard(
+                            modifier = Modifier.weight(1f),
+                            title = "History",
+                            subtitle = "Mine + family",
+                            icon = Icons.Default.History,
+                            accent = Color(0xFF7B61FF),
+                            onClick = onHistoryClick
+                        )
+
+                        QuickAccessCard(
+                            modifier = Modifier.weight(1f),
+                            title = "Nearby",
+                            subtitle = "Hospitals & pharmacy",
+                            icon = Icons.Default.Map,
+                            accent = Color(0xFF12B76A),
+                            onClick = onMapClick
+                        )
+
+                        QuickAccessCard(
+                            modifier = Modifier.weight(1f),
+                            title = "Settings",
+                            subtitle = "Profile & privacy",
+                            icon = Icons.Default.Settings,
+                            accent = Color(0xFFF79009),
+                            onClick = onSettingClick
+                        )
+                    }
+                }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(26.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF1F1)),
                 elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
             ) {
                 Column(
@@ -443,96 +417,67 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Personal Information",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        Spacer(modifier = Modifier.weight(1f))
-
-                        TextButton(
-                            onClick = { showEditDialog = true }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.size(4.dp))
-                            Text("Edit")
-                        }
-                    }
-
-                    HorizontalDivider(color = Color(0xFFE8EAF0))
-
-                    InfoRow(
-                        label = "Name",
-                        value = name.ifBlank { "None" }
-                    )
-                    InfoRow(
-                        label = "Phone",
-                        value = phone.ifBlank { "None" }
-                    )
-                    InfoRow(
-                        label = "Gender",
-                        value = gender.ifBlank { "None" }
-                    )
-                    InfoRow(
-                        label = "Height",
-                        value = if (height.isBlank()) "None" else "$height ft/in"
-                    )
-                    InfoRow(
-                        label = "Weight",
-                        value = if (weight.isBlank()) "None" else "$weight lbs"
-                    )
-                    InfoRow(
-                        label = "Age",
-                        value = if (age.isBlank()) "None" else "$age yrs"
-                    )
-                    InfoRow(
-                        label = "Address",
-                        value = address.ifBlank { "None" }
-                    )
-                }
-            }
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = emergencyBg),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Warning,
+                            imageVector = Icons.Default.Shield,
                             contentDescription = null,
-                            tint = emergencyAccent
+                            tint = Color(0xFFD92D20)
                         )
-
                         Text(
                             text = "Emergency",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = emergencyAccent
+                            color = Color(0xFFD92D20)
                         )
                     }
 
                     Text(
-                        text = "If you have severe chest pain, trouble breathing, or other serious symptoms, call 911 immediately.",
+                        text = "Severe chest pain, trouble breathing, heavy bleeding, or sudden weakness are emergency signs. Use the button below to open emergency calling immediately.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = emergencyAccent
+                        color = Color(0xFFB42318)
                     )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:911"))
+                                context.startActivity(dialIntent)
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFD92D20)
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Call,
+                                contentDescription = null
+                            )
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text("Call 911")
+                        }
+
+                        Button(
+                            onClick = onMapClick,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFB42318)
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Map,
+                                contentDescription = null
+                            )
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text("Find care")
+                        }
+                    }
                 }
             }
         }
@@ -540,24 +485,63 @@ fun HomeScreen(
 }
 
 @Composable
-private fun InfoRow(
-    label: String,
-    value: String
+private fun SuggestionItem(
+    title: String,
+    subtitle: String
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color(0xFF666A73)
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF111827)
         )
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = Color(0xFF667085)
+        )
+        HorizontalDivider(color = Color(0xFFE9EEF5))
+    }
+}
 
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium
-        )
+@Composable
+private fun QuickAccessCard(
+    modifier: Modifier = Modifier,
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    accent: Color,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .clickable { onClick() },
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFD)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = accent
+            )
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF111827)
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF667085)
+            )
+        }
     }
 }

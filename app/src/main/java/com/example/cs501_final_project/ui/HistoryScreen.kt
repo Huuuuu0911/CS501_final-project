@@ -1,52 +1,108 @@
 package com.example.cs501_final_project.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-@Composable
-fun HistoryScreen(
-    history: List<String>,
-    onHistoryItemClick: (String) -> Unit,
-    onBackClick: () -> Unit
-) {
-    val bgColor = Color(0xFFF6F8FC)
+private data class HistoryRecord(
+    val personName: String,
+    val group: String,
+    val date: String,
+    val concern: String,
+    val area: String,
+    val urgency: String,
+    val summary: String
+)
 
-    val headerGradient = Brush.horizontalGradient(
-        colors = listOf(
-            Color(0xFF5B8DEF),
-            Color(0xFF7B61FF)
+@Composable
+fun HistoryScreen() {
+    val bgColor = Color(0xFFF6F8FC)
+    var filter by remember { mutableStateOf("All") }
+
+    val records = remember {
+        listOf(
+            HistoryRecord(
+                personName = "You",
+                group = "Mine",
+                date = "Today · 10:40 AM",
+                concern = "Chest tightness",
+                area = "Center Chest",
+                urgency = "Primary Care",
+                summary = "Pain happens mainly during deep breathing and has been stable."
+            ),
+            HistoryRecord(
+                personName = "You",
+                group = "Mine",
+                date = "Apr 10 · 8:15 PM",
+                concern = "Lower back pain",
+                area = "Lower Back",
+                urgency = "Self Care",
+                summary = "Likely related to sitting posture and muscle strain after study hours."
+            ),
+            HistoryRecord(
+                personName = "Mom",
+                group = "Family",
+                date = "Apr 08 · 6:30 PM",
+                concern = "Knee swelling",
+                area = "Right Knee",
+                urgency = "Urgent Care",
+                summary = "Swelling increased after walking and family wanted a faster check."
+            ),
+            HistoryRecord(
+                personName = "Dad",
+                group = "Family",
+                date = "Apr 05 · 7:10 AM",
+                concern = "Shoulder soreness",
+                area = "Left Shoulder",
+                urgency = "Self Care",
+                summary = "Pain was mild and improved after rest and limited activity."
+            )
         )
-    )
+    }
+
+    val filteredRecords = remember(filter, records) {
+        when (filter) {
+            "Mine" -> records.filter { it.group == "Mine" }
+            "Family" -> records.filter { it.group == "Family" }
+            else -> records
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -55,185 +111,246 @@ fun HistoryScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 18.dp, vertical = 18.dp)
                 .navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-
-            // Header
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        brush = headerGradient,
-                        shape = RoundedCornerShape(28.dp)
-                    )
-                    .padding(22.dp)
-            ) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "History",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Text(
-                        text = "Review your previous symptom checks and results.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.9f)
-                    )
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "History",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFF111827)
+                )
+                Text(
+                    text = "View your own checks and family records in one timeline.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFF667085)
+                )
             }
 
-            if (history.isEmpty()) {
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(40.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "No history yet.\nStart a symptom check to see results here.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF666A73)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
-
-            } else {
-
-                LazyColumn(
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                SummaryCountCard(
                     modifier = Modifier.weight(1f),
+                    title = "Mine",
+                    value = records.count { it.group == "Mine" }.toString(),
+                    icon = Icons.Default.Person,
+                    accent = Color(0xFF4F8EEB)
+                )
+                SummaryCountCard(
+                    modifier = Modifier.weight(1f),
+                    title = "Family",
+                    value = records.count { it.group == "Family" }.toString(),
+                    icon = Icons.Default.Groups,
+                    accent = Color(0xFF12B76A)
+                )
+                SummaryCountCard(
+                    modifier = Modifier.weight(1f),
+                    title = "Recent",
+                    value = "7d",
+                    icon = Icons.Default.Schedule,
+                    accent = Color(0xFF7B61FF)
+                )
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    itemsIndexed(history) { index, item ->
-                        val urgency = getUrgencyTag(item)
-                        val tagColor = getUrgencyColor(urgency)
-                        val fakeTime = getFakeTimeLabel(index)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.History,
+                            contentDescription = null,
+                            tint = Color(0xFF7B61FF)
+                        )
+                        Text(
+                            text = "Filter Records",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
 
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onHistoryItemClick(item) },
-                            shape = RoundedCornerShape(22.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(18.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Symptom Record",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-
-                                    Spacer(modifier = Modifier.weight(1f))
-
-                                    AssistChip(
-                                        onClick = { },
-                                        label = {
-                                            Text(
-                                                text = urgency,
-                                                color = Color.White
-                                            )
-                                        },
-                                        colors = AssistChipDefaults.assistChipColors(
-                                            containerColor = tagColor,
-                                            labelColor = Color.White
-                                        )
-                                    )
-                                }
-
-                                Text(
-                                    text = fakeTime,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color(0xFF7A7F87)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("All", "Mine", "Family").forEach { option ->
+                            FilterChip(
+                                selected = filter == option,
+                                onClick = { filter = option },
+                                label = { Text(option) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Color(0xFFEAE6FF),
+                                    selectedLabelColor = Color(0xFF4B3BC8),
+                                    containerColor = Color(0xFFF6F8FC),
+                                    labelColor = Color(0xFF48556A)
                                 )
-
-                                HorizontalDivider(color = Color(0xFFE8EAF0))
-
-                                Text(
-                                    text = item,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Color(0xFF44474F)
-                                )
-
-                                Text(
-                                    text = "Tap to view details",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color(0xFF5B8DEF)
-                                )
-                            }
+                            )
                         }
                     }
                 }
             }
 
+            filteredRecords.forEach { record ->
+                HistoryRecordCard(record = record)
+            }
+
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFD)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Button(
-                    onClick = onBackClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF5B8DEF)
-                    )
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text("Back")
+                    Text(
+                        text = "Next Upgrade",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "When you connect this screen to saved Follow-up results, these cards can become a real timeline with search, family filters, and repeat-symptom trends.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF667085)
+                    )
                 }
             }
         }
     }
 }
 
-private fun getUrgencyTag(item: String): String {
-    val text = item.lowercase()
-
-    return when {
-        "emergency" in text -> "Emergency"
-        "urgent" in text -> "Urgent Care"
-        else -> "Primary Care"
+@Composable
+private fun SummaryCountCard(
+    modifier: Modifier = Modifier,
+    title: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    accent: Color
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = accent
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color(0xFF111827)
+            )
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF667085)
+            )
+        }
     }
 }
 
-private fun getUrgencyColor(tag: String): Color {
-    return when (tag) {
-        "Emergency" -> Color(0xFFE53935)
-        "Urgent Care" -> Color(0xFFFB8C00)
-        else -> Color(0xFF5B8DEF)
+@Composable
+private fun HistoryRecordCard(record: HistoryRecord) {
+    val urgencyColor = when (record.urgency) {
+        "Urgent Care" -> Color(0xFFF79009)
+        "Primary Care" -> Color(0xFF2E90FA)
+        else -> Color(0xFF12B76A)
     }
-}
 
-private fun getFakeTimeLabel(index: Int): String {
-    return when (index) {
-        0 -> "Today · 3:20 PM"
-        1 -> "Yesterday · 7:45 PM"
-        2 -> "Apr 10 · 10:15 AM"
-        3 -> "Apr 08 · 6:30 PM"
-        else -> "Earlier record"
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(26.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = record.personName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF111827)
+                    )
+                    Text(
+                        text = record.date,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF667085)
+                    )
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(urgencyColor.copy(alpha = 0.14f))
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = record.urgency,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = urgencyColor
+                    )
+                }
+            }
+
+            Text(
+                text = record.concern,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1F2937)
+            )
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF7B61FF))
+                )
+                Text(
+                    text = record.area,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFF344054)
+                )
+            }
+
+            Text(
+                text = record.summary,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF667085)
+            )
+        }
     }
 }

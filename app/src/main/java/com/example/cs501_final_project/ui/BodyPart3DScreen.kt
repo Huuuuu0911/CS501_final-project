@@ -1,5 +1,6 @@
 package com.example.cs501_final_project.ui
 
+import android.content.res.Configuration
 import android.net.Uri
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -37,6 +38,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -55,6 +57,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -104,8 +107,8 @@ enum class FollowUpType {
 fun BodyPart3DScreen(
     navController: NavController
 ) {
-    val engine = rememberEngine()
-    val modelLoader = rememberModelLoader(engine)
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     var rotationIndex by remember { mutableStateOf(0) }
     val rotationY = rotationIndex * 90f
@@ -132,213 +135,300 @@ fun BodyPart3DScreen(
         modifier = Modifier.fillMaxSize(),
         color = bgColor
     ) {
+        if (isLandscape) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+                    .navigationBarsPadding(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(1.05f)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    HeaderCard(
+                        title = "Body Area Check",
+                        subtitle = "Rotate the model and tap the glowing point where it hurts.",
+                        gradient = headerGradient
+                    )
+
+                    ModelViewerCard(
+                        currentSide = currentSide,
+                        rotationY = rotationY,
+                        hotspots = hotspots,
+                        navController = navController,
+                        modelHeight = 360.dp
+                    )
+                }
+
+                Column(
+                    modifier = Modifier
+                        .weight(0.95f)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    ControlsCard(
+                        onRotateLeft = {
+                            rotationIndex = (rotationIndex - 1 + 4) % 4
+                        },
+                        onRotateRight = {
+                            rotationIndex = (rotationIndex + 1) % 4
+                        }
+                    )
+
+                    VisibleAreasCard(
+                        hotspots = hotspots,
+                        navController = navController
+                    )
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 18.dp, vertical = 18.dp)
+                    .navigationBarsPadding(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                HeaderCard(
+                    title = "Body Area Check",
+                    subtitle = "Rotate the model and tap the glowing point where it hurts.",
+                    gradient = headerGradient
+                )
+
+                ModelViewerCard(
+                    currentSide = currentSide,
+                    rotationY = rotationY,
+                    hotspots = hotspots,
+                    navController = navController,
+                    modelHeight = 360.dp
+                )
+
+                ControlsCard(
+                    onRotateLeft = {
+                        rotationIndex = (rotationIndex - 1 + 4) % 4
+                    },
+                    onRotateRight = {
+                        rotationIndex = (rotationIndex + 1) % 4
+                    }
+                )
+
+                VisibleAreasCard(
+                    hotspots = hotspots,
+                    navController = navController
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeaderCard(
+    title: String,
+    subtitle: String,
+    gradient: Brush
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                brush = gradient,
+                shape = RoundedCornerShape(28.dp)
+            )
+            .padding(22.dp)
+    ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 18.dp, vertical = 18.dp)
-                .navigationBarsPadding(),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Box(
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineSmall,
+                color = Color.White
+            )
+
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.92f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ModelViewerCard(
+    currentSide: String,
+    rotationY: Float,
+    hotspots: List<BodyHotspot>,
+    navController: NavController,
+    modelHeight: Dp
+) {
+    val engine = rememberEngine()
+    val modelLoader = rememberModelLoader(engine)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "3D Body Viewer",
+                    style = MaterialTheme.typography.titleLarge
+                )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Color(0xFFF0F3FA))
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = currentSide,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color(0xFF44506A)
+                    )
+                }
+            }
+
+            Text(
+                text = "Rotate the model and tap a point.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF667085)
+            )
+
+            AppCard(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(
-                        brush = headerGradient,
-                        shape = RoundedCornerShape(28.dp)
-                    )
-                    .padding(22.dp)
+                    .height(modelHeight)
             ) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                Box(
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    Text(
-                        text = "Body Area Check",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = Color.White
-                    )
-
-                    Text(
-                        text = "Rotate the model and tap the glowing point where it hurts.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.92f)
-                    )
-                }
-            }
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                    SceneView(
+                        modifier = Modifier.fillMaxSize(),
+                        engine = engine,
+                        modelLoader = modelLoader
                     ) {
-                        Text(
-                            text = "3D Body Viewer",
-                            style = MaterialTheme.typography.titleLarge
-                        )
-
-                        Spacer(modifier = Modifier.weight(1f))
-
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(Color(0xFFF0F3FA))
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Text(
-                                text = currentSide,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = Color(0xFF44506A)
+                        rememberModelInstance(
+                            modelLoader = modelLoader,
+                            assetFileLocation = "models/male_model.glb"
+                        )?.let { modelInstance ->
+                            ModelNode(
+                                modelInstance = modelInstance,
+                                scaleToUnits = 0.65f,
+                                rotation = Rotation(y = rotationY)
                             )
                         }
                     }
 
-                    Text(
-                        text = "Tap any glowing point. You can rotate to front, back, left, or right.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF667085)
-                    )
-
-                    AppCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(560.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            SceneView(
-                                modifier = Modifier.fillMaxSize(),
-                                engine = engine,
-                                modelLoader = modelLoader
-                            ) {
-                                rememberModelInstance(
-                                    modelLoader = modelLoader,
-                                    assetFileLocation = "models/male_model.glb"
-                                )?.let { modelInstance ->
-                                    ModelNode(
-                                        modelInstance = modelInstance,
-                                        scaleToUnits = 0.65f,
-                                        rotation = Rotation(y = rotationY)
-                                    )
-                                }
-                            }
-
-                            HotspotOverlay(
-                                hotspots = hotspots,
-                                onTap = { part ->
-                                    navController.navigate("detail/${Uri.encode(part)}")
-                                }
-                            )
-
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .padding(bottom = 14.dp)
-                                    .clip(RoundedCornerShape(18.dp))
-                                    .background(Color.White.copy(alpha = 0.88f))
-                                    .border(
-                                        width = 1.dp,
-                                        color = Color(0xFFE8ECF5),
-                                        shape = RoundedCornerShape(18.dp)
-                                    )
-                                    .padding(horizontal = 14.dp, vertical = 10.dp)
-                            ) {
-                                Text(
-                                    text = "Tip: rotate and tap a glowing point",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color(0xFF5F6B85)
-                                )
-                            }
+                    HotspotOverlay(
+                        hotspots = hotspots,
+                        onTap = { part ->
+                            navController.navigate("detail/${Uri.encode(part)}")
                         }
-                    }
+                    )
                 }
             }
+        }
+    }
+}
 
-            Card(
+@Composable
+private fun ControlsCard(
+    onRotateLeft: () -> Unit,
+    onRotateRight: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "Model Controls",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Text(
-                        text = "Model Controls",
-                        style = MaterialTheme.typography.titleMedium
+                Button(
+                    onClick = onRotateLeft,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF5B8DEF)
                     )
+                ) {
+                    Text("Rotate Left")
+                }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                rotationIndex = (rotationIndex - 1 + 4) % 4
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(52.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF5B8DEF)
-                            )
-                        ) {
-                            Text("Rotate Left")
-                        }
-
-                        Button(
-                            onClick = {
-                                rotationIndex = (rotationIndex + 1) % 4
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(52.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF7B61FF)
-                            )
-                        ) {
-                            Text("Rotate Right")
-                        }
-                    }
+                Button(
+                    onClick = onRotateRight,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF7B61FF)
+                    )
+                ) {
+                    Text("Rotate Right")
                 }
             }
+        }
+    }
+}
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "Visible Areas",
-                        style = MaterialTheme.typography.titleMedium
-                    )
+@Composable
+private fun VisibleAreasCard(
+    hotspots: List<BodyHotspot>,
+    navController: NavController
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "Visible Areas",
+                style = MaterialTheme.typography.titleMedium
+            )
 
-                    ChipRows(
-                        items = hotspots.map { it.name },
-                        selectedItem = "",
-                        onItemClick = { name ->
-                            navController.navigate("detail/${Uri.encode(name)}")
-                        }
-                    )
+            ChipRows(
+                items = hotspots.map { it.name },
+                selectedItem = "",
+                onItemClick = { name ->
+                    navController.navigate("detail/${Uri.encode(name)}")
                 }
-            }
+            )
         }
     }
 }
@@ -428,6 +518,9 @@ fun DetailScreen(
     part: String,
     navController: NavController
 ) {
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
     var selectedDetail by remember { mutableStateOf("") }
     var symptomText by remember { mutableStateOf("") }
     var painLevel by remember { mutableFloatStateOf(5f) }
@@ -446,195 +539,280 @@ fun DetailScreen(
         modifier = Modifier.fillMaxSize(),
         color = bgColor
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 18.dp, vertical = 18.dp)
-                .navigationBarsPadding(),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Box(
+        if (isLandscape) {
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(topGradient, RoundedCornerShape(28.dp))
-                    .padding(22.dp)
+                    .fillMaxSize()
+                    .padding(16.dp)
+                    .navigationBarsPadding(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Symptom Check",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = Color.White
-                    )
+                HeaderCard(
+                    title = "Symptom Check",
+                    subtitle = selectedDetail.ifBlank { part },
+                    gradient = topGradient
+                )
 
-                    Text(
-                        text = selectedDetail.ifBlank { part },
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White.copy(alpha = 0.94f)
-                    )
-                }
-            }
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text(
-                        text = "Choose a more specific area",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-
-                    ChipRows(
-                        items = detailOptions,
-                        selectedItem = selectedDetail,
-                        onItemClick = { option ->
-                            selectedDetail = option
-                        }
-                    )
-
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFFF8FAFD)
-                        )
+                    Column(
+                        modifier = Modifier
+                            .width(420.dp)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = "Selected Area",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = Color(0xFF667085)
-                            )
+                        DetailAreaCard(
+                            detailOptions = detailOptions,
+                            selectedDetail = selectedDetail,
+                            onSelect = { selectedDetail = it }
+                        )
 
-                            Text(
-                                text = if (selectedDetail.isBlank()) "Nothing selected yet" else selectedDetail,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = Color(0xFF1F2937)
-                            )
+                        PainLevelCard(
+                            painLevel = painLevel,
+                            onValueChange = { painLevel = it }
+                        )
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .width(420.dp)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        SymptomInputCard(
+                            symptomText = symptomText,
+                            onSymptomChange = { symptomText = it },
+                            onContinue = {
+                                val partEncoded = Uri.encode(selectedDetail.ifBlank { part })
+                                val symptomEncoded = Uri.encode(symptomText)
+                                navController.navigate("follow_up/$partEncoded/$symptomEncoded/${painLevel.toInt()}")
+                            }
+                        )
+
+                        TextButton(
+                            onClick = { navController.popBackStack() },
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        ) {
+                            Text("Back")
                         }
                     }
                 }
             }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 18.dp, vertical = 18.dp)
+                    .navigationBarsPadding(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                HeaderCard(
+                    title = "Symptom Check",
+                    subtitle = selectedDetail.ifBlank { part },
+                    gradient = topGradient
+                )
+
+                DetailAreaCard(
+                    detailOptions = detailOptions,
+                    selectedDetail = selectedDetail,
+                    onSelect = { selectedDetail = it }
+                )
+
+                PainLevelCard(
+                    painLevel = painLevel,
+                    onValueChange = { painLevel = it }
+                )
+
+                SymptomInputCard(
+                    symptomText = symptomText,
+                    onSymptomChange = { symptomText = it },
+                    onContinue = {
+                        val partEncoded = Uri.encode(selectedDetail.ifBlank { part })
+                        val symptomEncoded = Uri.encode(symptomText)
+                        navController.navigate("follow_up/$partEncoded/$symptomEncoded/${painLevel.toInt()}")
+                    }
+                )
+
+                TextButton(
+                    onClick = { navController.popBackStack() },
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                ) {
+                    Text("Back")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailAreaCard(
+    detailOptions: List<String>,
+    selectedDetail: String,
+    onSelect: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "Choose a more specific area",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            ChipRows(
+                items = detailOptions,
+                selectedItem = selectedDetail,
+                onItemClick = onSelect
+            )
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFF8FAFD)
+                )
             ) {
                 Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
-                        text = "Pain Level",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-
-                    Text(
-                        text = "Move the slider from 0 to 10",
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = "Selected Area",
+                        style = MaterialTheme.typography.labelLarge,
                         color = Color(0xFF667085)
                     )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("0", color = Color(0xFF667085))
-                        Slider(
-                            value = painLevel,
-                            onValueChange = { painLevel = it },
-                            valueRange = 0f..10f,
-                            steps = 9,
-                            modifier = Modifier.weight(1f),
-                            colors = SliderDefaults.colors(
-                                thumbColor = Color(0xFF5B8DEF),
-                                activeTrackColor = Color(0xFF5B8DEF)
-                            )
-                        )
-                        Text("10", color = Color(0xFF667085))
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(Color(0xFFEFF4FF))
-                            .padding(horizontal = 14.dp, vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = "Current pain level: ${painLevel.toInt()}",
-                            color = Color(0xFF175CD3)
-                        )
-                    }
-                }
-            }
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
                     Text(
-                        text = "Describe your symptom",
-                        style = MaterialTheme.typography.titleMedium
+                        text = if (selectedDetail.isBlank()) "Nothing selected yet" else selectedDetail,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color(0xFF1F2937)
                     )
-
-                    OutlinedTextField(
-                        value = symptomText,
-                        onValueChange = { symptomText = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(140.dp),
-                        placeholder = {
-                            Text("Example: sharp pain when breathing, soreness, swelling, numbness...")
-                        },
-                        shape = RoundedCornerShape(18.dp),
-                        keyboardOptions = KeyboardOptions(
-                            capitalization = KeyboardCapitalization.Sentences
-                        ),
-                        singleLine = false
-                    )
-
-                    Button(
-                        onClick = {
-                            val partEncoded = Uri.encode(selectedDetail.ifBlank { part })
-                            val symptomEncoded = Uri.encode(symptomText)
-                            navController.navigate("follow_up/$partEncoded/$symptomEncoded/${painLevel.toInt()}")
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(54.dp),
-                        enabled = symptomText.isNotBlank(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF5B8DEF)
-                        )
-                    ) {
-                        Text("Continue")
-                    }
                 }
             }
+        }
+    }
+}
 
-            TextButton(
-                onClick = { navController.popBackStack() },
-                modifier = Modifier.align(Alignment.CenterHorizontally)
+@Composable
+private fun PainLevelCard(
+    painLevel: Float,
+    onValueChange: (Float) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Pain Level",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            Text(
+                text = "Move the slider from 0 to 10",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF667085)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Back")
+                Text("0", color = Color(0xFF667085))
+                Slider(
+                    value = painLevel,
+                    onValueChange = onValueChange,
+                    valueRange = 0f..10f,
+                    steps = 9,
+                    modifier = Modifier.weight(1f),
+                    colors = SliderDefaults.colors(
+                        thumbColor = Color(0xFF5B8DEF),
+                        activeTrackColor = Color(0xFF5B8DEF)
+                    )
+                )
+                Text("10", color = Color(0xFF667085))
+            }
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Color(0xFFEFF4FF))
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "Current pain level: ${painLevel.toInt()}",
+                    color = Color(0xFF175CD3)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SymptomInputCard(
+    symptomText: String,
+    onSymptomChange: (String) -> Unit,
+    onContinue: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "Describe your symptom",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            OutlinedTextField(
+                value = symptomText,
+                onValueChange = onSymptomChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(140.dp),
+                placeholder = {
+                    Text("Example: sharp pain when breathing, soreness, swelling, numbness...")
+                },
+                shape = RoundedCornerShape(18.dp),
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences
+                ),
+                singleLine = false
+            )
+
+            Button(
+                onClick = onContinue,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp),
+                enabled = symptomText.isNotBlank(),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF5B8DEF)
+                )
+            ) {
+                Text("Continue")
             }
         }
     }
@@ -647,6 +825,9 @@ fun FollowUpScreen(
     painLevel: Int,
     navController: NavController
 ) {
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
     val repository = remember { GeminiRepository() }
     val scope = rememberCoroutineScope()
 
@@ -706,267 +887,364 @@ fun FollowUpScreen(
         modifier = Modifier.fillMaxSize(),
         color = bgColor
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 18.dp, vertical = 18.dp)
-                .navigationBarsPadding(),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Box(
+        if (isLandscape) {
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(topGradient, RoundedCornerShape(28.dp))
-                    .padding(22.dp)
+                    .fillMaxSize()
+                    .padding(16.dp)
+                    .navigationBarsPadding(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Follow-up Questions",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = Color.White
-                    )
+                HeaderCard(
+                    title = "Follow-up Questions",
+                    subtitle = "Step 2 of 3 • $part",
+                    gradient = topGradient
+                )
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .width(430.dp)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Text(
-                            text = "Step 2 of 3",
-                            color = Color.White.copy(alpha = 0.88f)
+                        InitialSymptomCard(
+                            symptomText = symptomText,
+                            painLevel = painLevel
                         )
 
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(Color.White.copy(alpha = 0.18f))
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = part,
-                                color = Color.White
+                        if (loadingQuestions) {
+                            LoadingCard("Preparing follow-up questions...")
+                        } else {
+                            FollowUpFormCard(
+                                uiQuestions = uiQuestions,
+                                answer1 = answer1,
+                                answer2 = answer2,
+                                answer3 = answer3,
+                                optionalNote = optionalNote,
+                                onAnswer1 = { answer1 = it },
+                                onAnswer2 = { answer2 = it },
+                                onAnswer3 = { answer3 = it },
+                                onOptionalNote = { optionalNote = it },
+                                onSubmit = {
+                                    scope.launch {
+                                        loadingFinal = true
+                                        rawResponse = repository.askGeminiFinal(
+                                            bodyPart = part,
+                                            symptomText = symptomText,
+                                            painLevel = painLevel,
+                                            followUpAnswers = listOf(
+                                                "${uiQuestions.getOrNull(0)?.text ?: "Question 1"} Answer: $answer1",
+                                                "${uiQuestions.getOrNull(1)?.text ?: "Question 2"} Answer: $answer2",
+                                                "${uiQuestions.getOrNull(2)?.text ?: "Question 3"} Answer: $answer3",
+                                                "Optional note: $optionalNote"
+                                            ),
+                                            age = "21",
+                                            gender = "Female",
+                                            height = "5'6\"",
+                                            weight = "130",
+                                            address = "Boston"
+                                        )
+                                        loadingFinal = false
+                                    }
+                                }
                             )
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .width(430.dp)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        if (loadingFinal) {
+                            LoadingCard("Generating final assessment...")
+                        }
+
+                        if (rawResponse.isNotBlank()) {
+                            ResultCards(parsed)
+                        }
+
+                        TextButton(
+                            onClick = { navController.popBackStack() },
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        ) {
+                            Text("Back")
                         }
                     }
                 }
             }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 18.dp, vertical = 18.dp)
+                    .navigationBarsPadding(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                HeaderCard(
+                    title = "Follow-up Questions",
+                    subtitle = "Step 2 of 3 • $part",
+                    gradient = topGradient
+                )
+
+                InitialSymptomCard(
+                    symptomText = symptomText,
+                    painLevel = painLevel
+                )
+
+                if (loadingQuestions) {
+                    LoadingCard("Preparing follow-up questions...")
+                } else {
+                    FollowUpFormCard(
+                        uiQuestions = uiQuestions,
+                        answer1 = answer1,
+                        answer2 = answer2,
+                        answer3 = answer3,
+                        optionalNote = optionalNote,
+                        onAnswer1 = { answer1 = it },
+                        onAnswer2 = { answer2 = it },
+                        onAnswer3 = { answer3 = it },
+                        onOptionalNote = { optionalNote = it },
+                        onSubmit = {
+                            scope.launch {
+                                loadingFinal = true
+                                rawResponse = repository.askGeminiFinal(
+                                    bodyPart = part,
+                                    symptomText = symptomText,
+                                    painLevel = painLevel,
+                                    followUpAnswers = listOf(
+                                        "${uiQuestions.getOrNull(0)?.text ?: "Question 1"} Answer: $answer1",
+                                        "${uiQuestions.getOrNull(1)?.text ?: "Question 2"} Answer: $answer2",
+                                        "${uiQuestions.getOrNull(2)?.text ?: "Question 3"} Answer: $answer3",
+                                        "Optional note: $optionalNote"
+                                    ),
+                                    age = "21",
+                                    gender = "Female",
+                                    height = "5'6\"",
+                                    weight = "130",
+                                    address = "Boston"
+                                )
+                                loadingFinal = false
+                            }
+                        }
+                    )
+                }
+
+                if (loadingFinal) {
+                    LoadingCard("Generating final assessment...")
+                }
+
+                if (rawResponse.isNotBlank()) {
+                    ResultCards(parsed)
+                }
+
+                TextButton(
+                    onClick = { navController.popBackStack() },
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                ) {
+                    Text("Back")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InitialSymptomCard(
+    symptomText: String,
+    painLevel: Int
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "Initial Symptom",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            Text(
+                text = symptomText,
+                color = Color(0xFF344054)
+            )
+
+            Text(
+                text = "Pain level: $painLevel / 10",
+                color = Color(0xFF667085)
+            )
+        }
+    }
+}
+
+@Composable
+private fun FollowUpFormCard(
+    uiQuestions: List<FollowUpUiQuestion>,
+    answer1: String,
+    answer2: String,
+    answer3: String,
+    optionalNote: String,
+    onAnswer1: (String) -> Unit,
+    onAnswer2: (String) -> Unit,
+    onAnswer3: (String) -> Unit,
+    onOptionalNote: (String) -> Unit,
+    onSubmit: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            Text(
+                text = "Please answer these questions",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            QuestionCard(
+                index = 1,
+                question = uiQuestions.getOrNull(0)?.text ?: "Question 1",
+                type = uiQuestions.getOrNull(0)?.type ?: FollowUpType.TEXT,
+                value = answer1,
+                onValueChange = onAnswer1
+            )
+
+            QuestionCard(
+                index = 2,
+                question = uiQuestions.getOrNull(1)?.text ?: "Question 2",
+                type = uiQuestions.getOrNull(1)?.type ?: FollowUpType.TEXT,
+                value = answer2,
+                onValueChange = onAnswer2
+            )
+
+            QuestionCard(
+                index = 3,
+                question = uiQuestions.getOrNull(2)?.text ?: "Question 3",
+                type = uiQuestions.getOrNull(2)?.type ?: FollowUpType.TEXT,
+                value = answer3,
+                onValueChange = onAnswer3
+            )
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFD))
             ) {
                 Column(
-                    modifier = Modifier.padding(18.dp),
+                    modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        text = "Initial Symptom",
-                        style = MaterialTheme.typography.titleMedium
+                        text = "Optional Note",
+                        style = MaterialTheme.typography.titleSmall
                     )
 
-                    Text(
-                        text = symptomText,
-                        color = Color(0xFF344054)
-                    )
-
-                    Text(
-                        text = "Pain level: $painLevel / 10",
-                        color = Color(0xFF667085)
+                    OutlinedTextField(
+                        value = optionalNote,
+                        onValueChange = onOptionalNote,
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Anything else you want to mention?") },
+                        shape = RoundedCornerShape(16.dp)
                     )
                 }
             }
 
-            if (loadingQuestions) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(18.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(22.dp),
-                            strokeWidth = 2.5.dp
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("Preparing follow-up questions...")
-                    }
-                }
-            } else {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(18.dp)
-                    ) {
-                        Text(
-                            text = "Please answer these questions",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-
-                        QuestionCard(
-                            index = 1,
-                            question = uiQuestions.getOrNull(0)?.text ?: "Question 1",
-                            type = uiQuestions.getOrNull(0)?.type ?: FollowUpType.TEXT,
-                            value = answer1,
-                            onValueChange = { answer1 = it }
-                        )
-
-                        QuestionCard(
-                            index = 2,
-                            question = uiQuestions.getOrNull(1)?.text ?: "Question 2",
-                            type = uiQuestions.getOrNull(1)?.type ?: FollowUpType.TEXT,
-                            value = answer2,
-                            onValueChange = { answer2 = it }
-                        )
-
-                        QuestionCard(
-                            index = 3,
-                            question = uiQuestions.getOrNull(2)?.text ?: "Question 3",
-                            type = uiQuestions.getOrNull(2)?.type ?: FollowUpType.TEXT,
-                            value = answer3,
-                            onValueChange = { answer3 = it }
-                        )
-
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(22.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFD))
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Text(
-                                    text = "Optional Note",
-                                    style = MaterialTheme.typography.titleSmall
-                                )
-
-                                OutlinedTextField(
-                                    value = optionalNote,
-                                    onValueChange = { optionalNote = it },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    placeholder = { Text("Anything else you want to mention?") },
-                                    shape = RoundedCornerShape(16.dp)
-                                )
-                            }
-                        }
-
-                        Button(
-                            onClick = {
-                                scope.launch {
-                                    loadingFinal = true
-                                    rawResponse = repository.askGeminiFinal(
-                                        bodyPart = part,
-                                        symptomText = symptomText,
-                                        painLevel = painLevel,
-                                        followUpAnswers = listOf(
-                                            "${uiQuestions.getOrNull(0)?.text ?: "Question 1"} Answer: $answer1",
-                                            "${uiQuestions.getOrNull(1)?.text ?: "Question 2"} Answer: $answer2",
-                                            "${uiQuestions.getOrNull(2)?.text ?: "Question 3"} Answer: $answer3",
-                                            "Optional note: $optionalNote"
-                                        ),
-                                        age = "21",
-                                        gender = "Female",
-                                        height = "5'6\"",
-                                        weight = "130",
-                                        address = "Boston"
-                                    )
-                                    loadingFinal = false
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(56.dp),
-                            enabled = answer1.isNotBlank() && answer2.isNotBlank() && answer3.isNotBlank(),
-                            shape = RoundedCornerShape(18.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF5B8DEF)
-                            )
-                        ) {
-                            Text("Get Final Assessment")
-                        }
-                    }
-                }
-            }
-
-            if (loadingFinal) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(18.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(22.dp),
-                            strokeWidth = 2.5.dp
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("Generating final assessment...")
-                    }
-                }
-            }
-
-            if (rawResponse.isNotBlank()) {
-                UrgencyCard(parsed.urgency, parsed.summary)
-
-                SimpleSectionCard(
-                    title = "Key Points",
-                    items = parsed.keyPoints,
-                    cardColor = Color.White
+            Button(
+                onClick = onSubmit,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                enabled = answer1.isNotBlank() && answer2.isNotBlank() && answer3.isNotBlank(),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF5B8DEF)
                 )
-
-                SimpleSectionCard(
-                    title = "Next Steps",
-                    items = parsed.nextSteps,
-                    cardColor = Color.White
-                )
-
-                WarningCard(parsed.warningSigns)
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Text(
-                            text = "Detailed Note",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-
-                        HorizontalDivider(color = Color(0xFFE9EEF5))
-
-                        Text(
-                            text = parsed.notes,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF344054)
-                        )
-                    }
-                }
-            }
-
-            TextButton(
-                onClick = { navController.popBackStack() },
-                modifier = Modifier.align(Alignment.CenterHorizontally)
             ) {
-                Text("Back")
+                Text("Get Final Assessment")
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoadingCard(text: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Row(
+            modifier = Modifier.padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(22.dp),
+                strokeWidth = 2.5.dp
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(text)
+        }
+    }
+}
+
+@Composable
+private fun ResultCards(parsed: ParsedGeminiResponse) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        UrgencyCard(parsed.urgency, parsed.summary)
+
+        SimpleSectionCard(
+            title = "Key Points",
+            items = parsed.keyPoints,
+            cardColor = Color.White
+        )
+
+        SimpleSectionCard(
+            title = "Next Steps",
+            items = parsed.nextSteps,
+            cardColor = Color.White
+        )
+
+        WarningCard(parsed.warningSigns)
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Detailed Note",
+                    style = MaterialTheme.typography.titleMedium
+                )
+
+                HorizontalDivider(color = Color(0xFFE9EEF5))
+
+                Text(
+                    text = parsed.notes,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFF344054)
+                )
             }
         }
     }
@@ -1050,7 +1328,8 @@ private fun QuestionCard(
                         onValueChange = onValueChange,
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Your answer") },
-                        shape = RoundedCornerShape(16.dp)
+                        shape = RoundedCornerShape(16.dp),
+                        textStyle = LocalTextStyle.current
                     )
                 }
             }
