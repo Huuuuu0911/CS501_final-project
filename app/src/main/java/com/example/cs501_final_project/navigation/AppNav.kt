@@ -1,25 +1,44 @@
 package com.example.cs501_final_project.navigation
 
+import android.net.Uri
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.cs501_final_project.data.CareRouteViewModel
 import com.example.cs501_final_project.ui.BodyPart3DScreen
 import com.example.cs501_final_project.ui.DetailScreen
 import com.example.cs501_final_project.ui.FollowUpScreen
@@ -27,112 +46,105 @@ import com.example.cs501_final_project.ui.HistoryScreen
 import com.example.cs501_final_project.ui.HomeScreen
 import com.example.cs501_final_project.ui.MapScreen
 import com.example.cs501_final_project.ui.SettingScreen
-import androidx.compose.foundation.layout.padding
 
-sealed class BottomNavItem(
+private sealed class BottomNavDestination(
     val route: String,
-    val title: String
+    val label: String,
+    val icon: ImageVector,
+    val activeColor: Color
 ) {
-    object Home : BottomNavItem("home", "Home")
-    object History : BottomNavItem("history", "History")
-    object Map : BottomNavItem("map", "Map")
-    object Setting : BottomNavItem("setting", "Setting")
+    data object Home : BottomNavDestination("home", "Home", Icons.Default.Home, Color(0xFF4F8EEB))
+    data object History : BottomNavDestination("history", "History", Icons.Default.History, Color(0xFF7B61FF))
+    data object Map : BottomNavDestination("map", "Map", Icons.Default.Map, Color(0xFF12B76A))
+    data object Setting : BottomNavDestination("setting", "Setting", Icons.Default.Settings, Color(0xFFF79009))
 }
 
 @Composable
-fun AppNav() {
+fun AppNav(
+    viewModel: CareRouteViewModel
+) {
     val navController = rememberNavController()
-
-    val bottomItems = listOf(
-        BottomNavItem.Home,
-        BottomNavItem.History,
-        BottomNavItem.Map,
-        BottomNavItem.Setting
-    )
-
     val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentDestination = navBackStackEntry?.destination
-    val currentRoute = currentDestination?.route
+    val currentRoute = navBackStackEntry?.destination?.route
 
-    // 这些页面不显示底部导航栏
-    val hideBottomBarRoutes = listOf(
-        "body_3d",
-        "detail/{part}",
-        "follow_up/{part}/{symptomText}/{painLevel}"
+    val topLevelRoutes = setOf(
+        BottomNavDestination.Home.route,
+        BottomNavDestination.History.route,
+        BottomNavDestination.Map.route,
+        BottomNavDestination.Setting.route,
+        "map?query={query}"
     )
-
-    val showBottomBar = hideBottomBarRoutes.none { it == currentRoute }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            if (showBottomBar) {
-                NavigationBar {
-                    bottomItems.forEach { item ->
-                        val selected = currentDestination?.hierarchy?.any {
-                            it.route == item.route
-                        } == true
+            if (currentRoute in topLevelRoutes) {
+                CareRouteBottomBar(
+                    currentRoute = currentRoute,
+                    onNavigate = { route ->
+                        val targetRoute = when (route) {
+                            BottomNavDestination.Map.route -> "map"
+                            else -> route
+                        }
 
-                        NavigationBarItem(
-                            selected = selected,
-                            onClick = {
-                                navController.navigate(item.route) {
-                                    popUpTo(navController.graph.startDestinationId) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            icon = {
-                                when (item.route) {
-                                    "home" -> Icon(Icons.Default.Home, contentDescription = item.title)
-                                    "history" -> Icon(Icons.Default.History, contentDescription = item.title)
-                                    "map" -> Icon(Icons.Default.LocationOn, contentDescription = item.title)
-                                    else -> Icon(Icons.Default.Settings, contentDescription = item.title)
-                                }
-                            },
-                            label = { Text(item.title) }
-                        )
+                        navController.navigate(targetRoute) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     }
-                }
+                )
             }
         }
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = "home",
+            startDestination = BottomNavDestination.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable("home") {
+            composable(BottomNavDestination.Home.route) {
                 HomeScreen(
-                    onStartClick = {
-                        navController.navigate("body_3d")
-                    },
-                    onHistoryClick = {
-                        navController.navigate("history")
-                    },
-                    onMapClick = {
-                        navController.navigate("map")
-                    },
-                    onSettingClick = {
-                        navController.navigate("setting")
+                    viewModel = viewModel,
+                    onStartClick = { navController.navigate("body3d") },
+                    onHistoryClick = { navController.navigate(BottomNavDestination.History.route) },
+                    onMapClick = { navController.navigate(BottomNavDestination.Map.route) },
+                    onSettingClick = { navController.navigate(BottomNavDestination.Setting.route) }
+                )
+            }
+
+            composable(BottomNavDestination.History.route) {
+                HistoryScreen(
+                    viewModel = viewModel,
+                    onOpenMap = {
+                        navController.navigate(BottomNavDestination.Map.route)
                     }
                 )
             }
 
-            composable("history") {
-                HistoryScreen()
-            }
-
-            composable("map") {
+            composable(BottomNavDestination.Map.route) {
                 MapScreen()
             }
 
-            composable("setting") {
-                SettingScreen()
+            composable(
+                route = "map?query={query}",
+                arguments = listOf(
+                    navArgument("query") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                        nullable = true
+                    }
+                )
+            ) {
+                MapScreen()
             }
 
-            composable("body_3d") {
+            composable(BottomNavDestination.Setting.route) {
+                SettingScreen(viewModel = viewModel)
+            }
+
+            composable("body3d") {
                 BodyPart3DScreen(navController = navController)
             }
 
@@ -144,9 +156,8 @@ fun AppNav() {
                     }
                 )
             ) { backStackEntry ->
-                val part = backStackEntry.arguments?.getString("part") ?: ""
                 DetailScreen(
-                    part = part,
+                    part = Uri.decode(backStackEntry.arguments?.getString("part").orEmpty()),
                     navController = navController
                 )
             }
@@ -154,21 +165,105 @@ fun AppNav() {
             composable(
                 route = "follow_up/{part}/{symptomText}/{painLevel}",
                 arguments = listOf(
-                    navArgument("part") { type = NavType.StringType },
-                    navArgument("symptomText") { type = NavType.StringType },
-                    navArgument("painLevel") { type = NavType.IntType }
+                    navArgument("part") {
+                        type = NavType.StringType
+                    },
+                    navArgument("symptomText") {
+                        type = NavType.StringType
+                    },
+                    navArgument("painLevel") {
+                        type = NavType.StringType
+                    }
                 )
             ) { backStackEntry ->
-                val part = backStackEntry.arguments?.getString("part") ?: ""
-                val symptomText = backStackEntry.arguments?.getString("symptomText") ?: ""
-                val painLevel = backStackEntry.arguments?.getInt("painLevel") ?: 0
-
                 FollowUpScreen(
-                    part = part,
-                    symptomText = symptomText,
-                    painLevel = painLevel,
-                    navController = navController
+                    part = Uri.decode(backStackEntry.arguments?.getString("part").orEmpty()),
+                    symptomText = Uri.decode(backStackEntry.arguments?.getString("symptomText").orEmpty()),
+                    painLevel = backStackEntry.arguments?.getString("painLevel")?.toIntOrNull() ?: 0,
+                    navController = navController,
+                    viewModel = viewModel
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CareRouteBottomBar(
+    currentRoute: String?,
+    onNavigate: (String) -> Unit
+) {
+    val items = listOf(
+        BottomNavDestination.Home,
+        BottomNavDestination.History,
+        BottomNavDestination.Map,
+        BottomNavDestination.Setting
+    )
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        shape = RoundedCornerShape(28.dp),
+        shadowElevation = 14.dp,
+        tonalElevation = 8.dp,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            items.forEach { item ->
+                val selected = when (item.route) {
+                    "map" -> currentRoute == "map" || currentRoute == "map?query={query}"
+                    else -> currentRoute == item.route
+                }
+
+                val selectedBrush = Brush.horizontalGradient(
+                    colors = listOf(
+                        item.activeColor.copy(alpha = 0.18f),
+                        item.activeColor.copy(alpha = 0.08f)
+                    )
+                )
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(
+                            brush = if (selected) {
+                                selectedBrush
+                            } else {
+                                Brush.horizontalGradient(
+                                    colors = listOf(Color.Transparent, Color.Transparent)
+                                )
+                            }
+                        )
+                        .clickable { onNavigate(item.route) }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = item.icon,
+                            contentDescription = item.label,
+                            tint = if (selected) item.activeColor else Color(0xFF98A2B3)
+                        )
+
+                        Text(
+                            text = item.label,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (selected) item.activeColor else Color(0xFF667085)
+                        )
+                    }
+                }
             }
         }
     }
