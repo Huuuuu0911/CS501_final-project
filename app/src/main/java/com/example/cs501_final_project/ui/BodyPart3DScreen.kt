@@ -8,6 +8,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,6 +31,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocalPharmacy
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -38,8 +44,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -50,22 +58,30 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.cs501_final_project.data.CareRouteViewModel
 import com.example.cs501_final_project.data.GeminiRepository
-import com.example.cs501_final_project.ui.components.AppCard
+import com.example.cs501_final_project.data.SavedCheckRecord
 import io.github.sceneview.SceneView
 import io.github.sceneview.math.Rotation
 import io.github.sceneview.node.ModelNode
@@ -73,18 +89,39 @@ import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
 import kotlinx.coroutines.launch
+import java.util.UUID
+import kotlin.math.min
+import kotlin.math.roundToInt
+
+private data class BodyFrameBounds(
+    val leftRatio: Float,
+    val topRatio: Float,
+    val widthRatio: Float,
+    val heightRatio: Float
+)
 
 data class BodyHotspot(
     val name: String,
-    val x: Dp,
-    val y: Dp,
-    val size: Dp = 34.dp
+    val xRatio: Float,
+    val yRatio: Float,
+    val sizeRatio: Float = 0.065f
+)
+
+private data class BodyOverlaySpec(
+    val bounds: BodyFrameBounds,
+    val hotspots: List<BodyHotspot>
 )
 
 data class ParsedGeminiResponse(
     val urgency: String,
+    val careLevel: String,
+    val placeType: String,
+    val mapQuery: String,
+    val recommendationScore: Int,
     val summary: String,
     val keyPoints: List<String>,
+    val selfCare: List<String>,
+    val otcOptions: List<String>,
     val nextSteps: List<String>,
     val warningSigns: List<String>,
     val notes: String
@@ -109,8 +146,9 @@ fun BodyPart3DScreen(
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val useTwoPane = isLandscape && configuration.screenWidthDp >= 720
 
-    var rotationIndex by remember { mutableStateOf(0) }
+    var rotationIndex by rememberSaveable { mutableIntStateOf(0) }
     val rotationY = rotationIndex * 90f
 
     val currentSide = when (rotationIndex) {
@@ -121,21 +159,23 @@ fun BodyPart3DScreen(
         else -> "Front"
     }
 
-    val bgColor = Color(0xFFF5F7FC)
+    val overlaySpec = remember(currentSide, useTwoPane) {
+        getBodyOverlaySpec(currentSide, useTwoPane)
+    }
+
+    val bgColor = MaterialTheme.colorScheme.background
     val headerGradient = Brush.horizontalGradient(
         colors = listOf(
-            Color(0xFF5B8DEF),
+            MaterialTheme.colorScheme.primary,
             Color(0xFF7B61FF)
         )
     )
-
-    val hotspots = remember(currentSide) { getHotspotsForSide(currentSide) }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = bgColor
     ) {
-        if (isLandscape) {
+        if (useTwoPane) {
             Row(
                 modifier = Modifier
                     .fillMaxSize()
@@ -151,16 +191,16 @@ fun BodyPart3DScreen(
                 ) {
                     HeaderCard(
                         title = "Body Area Check",
-                        subtitle = "Rotate the model and tap the glowing point where it hurts.",
+                        subtitle = "Rotate the model and tap the hotspot closest to the painful area.",
                         gradient = headerGradient
                     )
 
                     ModelViewerCard(
                         currentSide = currentSide,
                         rotationY = rotationY,
-                        hotspots = hotspots,
+                        overlaySpec = overlaySpec,
                         navController = navController,
-                        modelHeight = 360.dp
+                        modelHeight = 420.dp
                     )
                 }
 
@@ -180,7 +220,7 @@ fun BodyPart3DScreen(
                     )
 
                     VisibleAreasCard(
-                        hotspots = hotspots,
+                        hotspots = overlaySpec.hotspots,
                         navController = navController
                     )
                 }
@@ -196,16 +236,16 @@ fun BodyPart3DScreen(
             ) {
                 HeaderCard(
                     title = "Body Area Check",
-                    subtitle = "Rotate the model and tap the glowing point where it hurts.",
+                    subtitle = "Rotate the model and tap the hotspot closest to the painful area.",
                     gradient = headerGradient
                 )
 
                 ModelViewerCard(
                     currentSide = currentSide,
                     rotationY = rotationY,
-                    hotspots = hotspots,
+                    overlaySpec = overlaySpec,
                     navController = navController,
-                    modelHeight = 360.dp
+                    modelHeight = 380.dp
                 )
 
                 ControlsCard(
@@ -218,7 +258,7 @@ fun BodyPart3DScreen(
                 )
 
                 VisibleAreasCard(
-                    hotspots = hotspots,
+                    hotspots = overlaySpec.hotspots,
                     navController = navController
                 )
             }
@@ -263,7 +303,7 @@ private fun HeaderCard(
 private fun ModelViewerCard(
     currentSide: String,
     rotationY: Float,
-    hotspots: List<BodyHotspot>,
+    overlaySpec: BodyOverlaySpec,
     navController: NavController,
     modelHeight: Dp
 ) {
@@ -273,8 +313,8 @@ private fun ModelViewerCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -306,15 +346,17 @@ private fun ModelViewerCard(
             }
 
             Text(
-                text = "Rotate the model and tap a point.",
+                text = "Tap the exact area that hurts.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color(0xFF667085)
             )
 
-            AppCard(
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(modelHeight)
+                    .height(modelHeight),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFD))
             ) {
                 Box(
                     modifier = Modifier.fillMaxSize()
@@ -337,7 +379,7 @@ private fun ModelViewerCard(
                     }
 
                     HotspotOverlay(
-                        hotspots = hotspots,
+                        overlaySpec = overlaySpec,
                         onTap = { part ->
                             navController.navigate("detail/${Uri.encode(part)}")
                         }
@@ -356,8 +398,8 @@ private fun ControlsCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -377,10 +419,7 @@ private fun ControlsCard(
                     modifier = Modifier
                         .weight(1f)
                         .height(52.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF5B8DEF)
-                    )
+                    shape = RoundedCornerShape(16.dp)
                 ) {
                     Text("Rotate Left")
                 }
@@ -410,7 +449,7 @@ private fun VisibleAreasCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
@@ -469,44 +508,62 @@ private fun ChipRows(
 
 @Composable
 private fun HotspotOverlay(
-    hotspots: List<BodyHotspot>,
+    overlaySpec: BodyOverlaySpec,
     onTap: (String) -> Unit
 ) {
     val transition = rememberInfiniteTransition(label = "pulse")
     val pulse by transition.animateFloat(
-        initialValue = 0.92f,
-        targetValue = 1.18f,
+        initialValue = 0.95f,
+        targetValue = 1.12f,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 1100, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulseValue"
     )
+    val density = LocalDensity.current
+    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        hotspots.forEach { hotspot ->
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onSizeChanged { canvasSize = it }
+    ) {
+        if (canvasSize.width == 0 || canvasSize.height == 0) return@Box
+
+        val bodyFrameLeft = canvasSize.width * overlaySpec.bounds.leftRatio
+        val bodyFrameTop = canvasSize.height * overlaySpec.bounds.topRatio
+        val bodyFrameWidth = canvasSize.width * overlaySpec.bounds.widthRatio
+        val bodyFrameHeight = canvasSize.height * overlaySpec.bounds.heightRatio
+        val referenceSize = min(bodyFrameWidth, bodyFrameHeight)
+
+        overlaySpec.hotspots.forEach { hotspot ->
+            val baseSizePx = referenceSize * hotspot.sizeRatio
+            val animatedSizePx = baseSizePx * pulse
+            val xPx = bodyFrameLeft + (bodyFrameWidth * hotspot.xRatio) - (animatedSizePx / 2f)
+            val yPx = bodyFrameTop + (bodyFrameHeight * hotspot.yRatio) - (animatedSizePx / 2f)
+            val ringSizeDp = with(density) { animatedSizePx.toDp() }
+            val dotSizeDp = with(density) { (baseSizePx * 0.42f).toDp() }
+
             Box(
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .offset(x = hotspot.x, y = hotspot.y)
-                    .size(hotspot.size * pulse)
+                    .offset { IntOffset(xPx.roundToInt(), yPx.roundToInt()) }
+                    .size(ringSizeDp)
                     .clip(CircleShape)
-                    .background(Color(0xFF7B61FF).copy(alpha = 0.14f))
+                    .background(Color(0xFF7B61FF).copy(alpha = 0.12f))
                     .border(
                         width = 2.dp,
-                        color = Color(0xFF7B61FF).copy(alpha = 0.65f),
+                        color = Color(0xFF7B61FF).copy(alpha = 0.75f),
                         shape = CircleShape
                     )
-                    .clickable {
-                        onTap(hotspot.name)
-                    }
+                    .clickable { onTap(hotspot.name) }
             ) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .size(hotspot.size * 0.42f)
+                        .size(dotSizeDp)
                         .clip(CircleShape)
-                        .background(Color(0xFF5B8DEF))
+                        .background(MaterialTheme.colorScheme.primary)
                 )
             }
         }
@@ -520,15 +577,16 @@ fun DetailScreen(
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val useTwoPane = isLandscape && configuration.screenWidthDp >= 720
 
-    var selectedDetail by remember { mutableStateOf("") }
-    var symptomText by remember { mutableStateOf("") }
-    var painLevel by remember { mutableFloatStateOf(5f) }
+    var selectedDetail by rememberSaveable(part) { mutableStateOf("") }
+    var symptomText by rememberSaveable(part) { mutableStateOf("") }
+    var painLevel by rememberSaveable(part) { mutableFloatStateOf(5f) }
 
-    val bgColor = Color(0xFFF5F7FC)
+    val bgColor = MaterialTheme.colorScheme.background
     val topGradient = Brush.horizontalGradient(
         colors = listOf(
-            Color(0xFF5B8DEF),
+            MaterialTheme.colorScheme.primary,
             Color(0xFF7B61FF)
         )
     )
@@ -539,7 +597,7 @@ fun DetailScreen(
         modifier = Modifier.fillMaxSize(),
         color = bgColor
     ) {
-        if (isLandscape) {
+        if (useTwoPane) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -554,14 +612,12 @@ fun DetailScreen(
                 )
 
                 Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .horizontalScroll(rememberScrollState()),
+                    modifier = Modifier.fillMaxSize(),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Column(
                         modifier = Modifier
-                            .width(420.dp)
+                            .weight(1f)
                             .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
@@ -579,7 +635,7 @@ fun DetailScreen(
 
                     Column(
                         modifier = Modifier
-                            .width(420.dp)
+                            .weight(1f)
                             .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
@@ -658,8 +714,8 @@ private fun DetailAreaCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -694,7 +750,7 @@ private fun DetailAreaCard(
                     )
 
                     Text(
-                        text = if (selectedDetail.isBlank()) "Nothing selected yet" else selectedDetail,
+                        text = selectedDetail.ifBlank { "Nothing selected yet" },
                         style = MaterialTheme.typography.titleMedium,
                         color = Color(0xFF1F2937)
                     )
@@ -712,8 +768,8 @@ private fun PainLevelCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -735,6 +791,7 @@ private fun PainLevelCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("0", color = Color(0xFF667085))
+
                 Slider(
                     value = painLevel,
                     onValueChange = onValueChange,
@@ -742,22 +799,23 @@ private fun PainLevelCard(
                     steps = 9,
                     modifier = Modifier.weight(1f),
                     colors = SliderDefaults.colors(
-                        thumbColor = Color(0xFF5B8DEF),
-                        activeTrackColor = Color(0xFF5B8DEF)
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary
                     )
                 )
+
                 Text("10", color = Color(0xFF667085))
             }
 
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(999.dp))
-                    .background(Color(0xFFEFF4FF))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
                     .padding(horizontal = 14.dp, vertical = 8.dp)
             ) {
                 Text(
                     text = "Current pain level: ${painLevel.toInt()}",
-                    color = Color(0xFF175CD3)
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -773,8 +831,8 @@ private fun SymptomInputCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -807,10 +865,7 @@ private fun SymptomInputCard(
                     .fillMaxWidth()
                     .height(54.dp),
                 enabled = symptomText.isNotBlank(),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF5B8DEF)
-                )
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Text("Continue")
             }
@@ -823,32 +878,45 @@ fun FollowUpScreen(
     part: String,
     symptomText: String,
     painLevel: Int,
-    navController: NavController
+    navController: NavController,
+    viewModel: CareRouteViewModel
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val useTwoPane = isLandscape && configuration.screenWidthDp >= 720
 
     val repository = remember { GeminiRepository() }
     val scope = rememberCoroutineScope()
+    val patient = viewModel.activePatientContext()
+    val recentHistory = remember(viewModel.historyRecords.size, patient.id) {
+        viewModel.recentHistorySummariesFor(patient.id)
+    }
 
-    val bgColor = Color(0xFFF5F7FC)
+    val bgColor = MaterialTheme.colorScheme.background
     val topGradient = Brush.horizontalGradient(
         colors = listOf(
-            Color(0xFF5B8DEF),
+            MaterialTheme.colorScheme.primary,
             Color(0xFF7B61FF)
         )
     )
 
-    var loadingQuestions by remember { mutableStateOf(true) }
-    var loadingFinal by remember { mutableStateOf(false) }
+    var questionsLoaded by rememberSaveable(part, symptomText, painLevel, patient.id) { mutableStateOf(false) }
+    var loadingQuestions by rememberSaveable(part, symptomText, painLevel, patient.id) { mutableStateOf(false) }
+    var loadingFinal by rememberSaveable(part, symptomText, painLevel, patient.id) { mutableStateOf(false) }
+    var rawQuestionsSerialized by rememberSaveable(part, symptomText, painLevel, patient.id) { mutableStateOf("") }
+    var rawResponse by rememberSaveable(part, symptomText, painLevel, patient.id) { mutableStateOf("") }
+    var answer1 by rememberSaveable(part, symptomText, painLevel, patient.id) { mutableStateOf("") }
+    var answer2 by rememberSaveable(part, symptomText, painLevel, patient.id) { mutableStateOf("") }
+    var answer3 by rememberSaveable(part, symptomText, painLevel, patient.id) { mutableStateOf("") }
+    var optionalNote by rememberSaveable(part, symptomText, painLevel, patient.id) { mutableStateOf("") }
+    var recordSaved by rememberSaveable(part, symptomText, painLevel, patient.id) { mutableStateOf(false) }
 
-    var rawQuestions by remember { mutableStateOf(listOf<String>()) }
-    var rawResponse by remember { mutableStateOf("") }
-
-    var answer1 by remember { mutableStateOf("") }
-    var answer2 by remember { mutableStateOf("") }
-    var answer3 by remember { mutableStateOf("") }
-    var optionalNote by remember { mutableStateOf("") }
+    val rawQuestions = remember(rawQuestionsSerialized) {
+        rawQuestionsSerialized
+            .split("\n")
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+    }
 
     val parsed = remember(rawResponse) { parseGeminiResponse(rawResponse) }
 
@@ -861,25 +929,27 @@ fun FollowUpScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(part, symptomText, painLevel, patient.id) {
+        if (questionsLoaded || rawQuestionsSerialized.isNotBlank()) return@LaunchedEffect
+
+        loadingQuestions = true
         try {
-            rawQuestions = repository.getFollowUpQuestions(
+            val fetchedQuestions = repository.getFollowUpQuestions(
                 bodyPart = part,
                 symptomText = symptomText,
                 painLevel = painLevel,
-                age = "21",
-                gender = "Female",
-                height = "5'6\"",
-                weight = "130",
-                address = "Boston"
+                patient = patient,
+                recentHistory = recentHistory
             )
-        } catch (e: Exception) {
-            rawQuestions = listOf(
+            rawQuestionsSerialized = fetchedQuestions.joinToString("\n")
+        } catch (_: Exception) {
+            rawQuestionsSerialized = listOf(
                 "Has it been getting worse?",
                 "When did it start?",
                 "Do you have any other symptoms?"
-            )
+            ).joinToString("\n")
         }
+        questionsLoaded = true
         loadingQuestions = false
     }
 
@@ -887,7 +957,7 @@ fun FollowUpScreen(
         modifier = Modifier.fillMaxSize(),
         color = bgColor
     ) {
-        if (isLandscape) {
+        if (useTwoPane) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -897,29 +967,28 @@ fun FollowUpScreen(
             ) {
                 HeaderCard(
                     title = "Follow-up Questions",
-                    subtitle = "Step 2 of 3 • $part",
+                    subtitle = "Step 2 of 3 • $part • ${patient.displayName}",
                     gradient = topGradient
                 )
 
                 Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .horizontalScroll(rememberScrollState()),
+                    modifier = Modifier.fillMaxSize(),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Column(
                         modifier = Modifier
-                            .width(430.dp)
+                            .weight(1f)
                             .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         InitialSymptomCard(
                             symptomText = symptomText,
-                            painLevel = painLevel
+                            painLevel = painLevel,
+                            patientName = patient.displayName
                         )
 
-                        if (loadingQuestions) {
-                            LoadingCard("Preparing follow-up questions...")
+                        if (loadingQuestions && rawQuestions.isEmpty()) {
+                            LoadingCard("Preparing personalized follow-up questions...")
                         } else {
                             FollowUpFormCard(
                                 uiQuestions = uiQuestions,
@@ -944,13 +1013,30 @@ fun FollowUpScreen(
                                                 "${uiQuestions.getOrNull(2)?.text ?: "Question 3"} Answer: $answer3",
                                                 "Optional note: $optionalNote"
                                             ),
-                                            age = "21",
-                                            gender = "Female",
-                                            height = "5'6\"",
-                                            weight = "130",
-                                            address = "Boston"
+                                            patient = patient,
+                                            recentHistory = recentHistory
                                         )
                                         loadingFinal = false
+
+                                        if (!recordSaved) {
+                                            val parsedResponse = parseGeminiResponse(rawResponse)
+                                            viewModel.addHistoryRecord(
+                                                SavedCheckRecord(
+                                                    id = UUID.randomUUID().toString(),
+                                                    personId = patient.id,
+                                                    personName = patient.displayName,
+                                                    personGroup = patient.group,
+                                                    bodyPart = part,
+                                                    symptomText = symptomText,
+                                                    painLevel = painLevel,
+                                                    urgency = parsedResponse.urgency,
+                                                    careLevel = parsedResponse.careLevel,
+                                                    summary = parsedResponse.summary,
+                                                    mapQuery = parsedResponse.mapQuery
+                                                )
+                                            )
+                                            recordSaved = true
+                                        }
                                     }
                                 }
                             )
@@ -959,7 +1045,7 @@ fun FollowUpScreen(
 
                     Column(
                         modifier = Modifier
-                            .width(430.dp)
+                            .weight(1f)
                             .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
@@ -968,7 +1054,14 @@ fun FollowUpScreen(
                         }
 
                         if (rawResponse.isNotBlank()) {
-                            ResultCards(parsed)
+                            ResultCards(
+                                parsed = parsed,
+                                onOpenMap = {
+                                    if (parsed.mapQuery.isNotBlank() && parsed.mapQuery.lowercase() != "none") {
+                                        navController.navigate("map?query=${Uri.encode(parsed.mapQuery)}")
+                                    }
+                                }
+                            )
                         }
 
                         TextButton(
@@ -991,17 +1084,18 @@ fun FollowUpScreen(
             ) {
                 HeaderCard(
                     title = "Follow-up Questions",
-                    subtitle = "Step 2 of 3 • $part",
+                    subtitle = "Step 2 of 3 • $part • ${patient.displayName}",
                     gradient = topGradient
                 )
 
                 InitialSymptomCard(
                     symptomText = symptomText,
-                    painLevel = painLevel
+                    painLevel = painLevel,
+                    patientName = patient.displayName
                 )
 
-                if (loadingQuestions) {
-                    LoadingCard("Preparing follow-up questions...")
+                if (loadingQuestions && rawQuestions.isEmpty()) {
+                    LoadingCard("Preparing personalized follow-up questions...")
                 } else {
                     FollowUpFormCard(
                         uiQuestions = uiQuestions,
@@ -1026,13 +1120,30 @@ fun FollowUpScreen(
                                         "${uiQuestions.getOrNull(2)?.text ?: "Question 3"} Answer: $answer3",
                                         "Optional note: $optionalNote"
                                     ),
-                                    age = "21",
-                                    gender = "Female",
-                                    height = "5'6\"",
-                                    weight = "130",
-                                    address = "Boston"
+                                    patient = patient,
+                                    recentHistory = recentHistory
                                 )
                                 loadingFinal = false
+
+                                if (!recordSaved) {
+                                    val parsedResponse = parseGeminiResponse(rawResponse)
+                                    viewModel.addHistoryRecord(
+                                        SavedCheckRecord(
+                                            id = UUID.randomUUID().toString(),
+                                            personId = patient.id,
+                                            personName = patient.displayName,
+                                            personGroup = patient.group,
+                                            bodyPart = part,
+                                            symptomText = symptomText,
+                                            painLevel = painLevel,
+                                            urgency = parsedResponse.urgency,
+                                            careLevel = parsedResponse.careLevel,
+                                            summary = parsedResponse.summary,
+                                            mapQuery = parsedResponse.mapQuery
+                                        )
+                                    )
+                                    recordSaved = true
+                                }
                             }
                         }
                     )
@@ -1043,7 +1154,14 @@ fun FollowUpScreen(
                 }
 
                 if (rawResponse.isNotBlank()) {
-                    ResultCards(parsed)
+                    ResultCards(
+                        parsed = parsed,
+                        onOpenMap = {
+                            if (parsed.mapQuery.isNotBlank() && parsed.mapQuery.lowercase() != "none") {
+                                navController.navigate("map?query=${Uri.encode(parsed.mapQuery)}")
+                            }
+                        }
+                    )
                 }
 
                 TextButton(
@@ -1060,13 +1178,14 @@ fun FollowUpScreen(
 @Composable
 private fun InitialSymptomCard(
     symptomText: String,
-    painLevel: Int
+    painLevel: Int,
+    patientName: String
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -1075,6 +1194,11 @@ private fun InitialSymptomCard(
             Text(
                 text = "Initial Symptom",
                 style = MaterialTheme.typography.titleMedium
+            )
+
+            Text(
+                text = "Patient: $patientName",
+                color = Color(0xFF667085)
             )
 
             Text(
@@ -1106,8 +1230,8 @@ private fun FollowUpFormCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -1172,10 +1296,7 @@ private fun FollowUpFormCard(
                     .fillMaxWidth()
                     .height(56.dp),
                 enabled = answer1.isNotBlank() && answer2.isNotBlank() && answer3.isNotBlank(),
-                shape = RoundedCornerShape(18.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF5B8DEF)
-                )
+                shape = RoundedCornerShape(18.dp)
             ) {
                 Text("Get Final Assessment")
             }
@@ -1188,7 +1309,8 @@ private fun LoadingCard(text: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Row(
             modifier = Modifier.padding(18.dp),
@@ -1205,20 +1327,35 @@ private fun LoadingCard(text: String) {
 }
 
 @Composable
-private fun ResultCards(parsed: ParsedGeminiResponse) {
+private fun ResultCards(
+    parsed: ParsedGeminiResponse,
+    onOpenMap: () -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        UrgencyCard(parsed.urgency, parsed.summary)
+        RecommendationSummaryCard(parsed = parsed, onOpenMap = onOpenMap)
 
         SimpleSectionCard(
             title = "Key Points",
             items = parsed.keyPoints,
-            cardColor = Color.White
+            bulletColor = Color(0xFF7B61FF)
+        )
+
+        SimpleSectionCard(
+            title = "At Home / Self Care",
+            items = parsed.selfCare,
+            bulletColor = Color(0xFF12B76A)
+        )
+
+        SimpleSectionCard(
+            title = "OTC Options",
+            items = parsed.otcOptions,
+            bulletColor = Color(0xFF4F8EEB)
         )
 
         SimpleSectionCard(
             title = "Next Steps",
             items = parsed.nextSteps,
-            cardColor = Color.White
+            bulletColor = Color(0xFF7B61FF)
         )
 
         WarningCard(parsed.warningSigns)
@@ -1226,8 +1363,8 @@ private fun ResultCards(parsed: ParsedGeminiResponse) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
         ) {
             Column(
                 modifier = Modifier.padding(18.dp),
@@ -1245,6 +1382,259 @@ private fun ResultCards(parsed: ParsedGeminiResponse) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color(0xFF344054)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecommendationSummaryCard(
+    parsed: ParsedGeminiResponse,
+    onOpenMap: () -> Unit
+) {
+    val urgencyColor = when (parsed.urgency.trim()) {
+        "Emergency" -> Color(0xFFD92D20)
+        "Urgent Care" -> Color(0xFFF79009)
+        "Primary Care" -> Color(0xFF2E90FA)
+        else -> Color(0xFF12B76A)
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, urgencyColor.copy(alpha = 0.18f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Assessment",
+                    style = MaterialTheme.typography.titleMedium
+                )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(urgencyColor)
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = parsed.urgency,
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+            }
+
+            Text(
+                text = parsed.summary,
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color(0xFF344054)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                SummaryMetricCard(
+                    modifier = Modifier.weight(1f),
+                    label = "Confidence",
+                    value = "${parsed.recommendationScore}/5",
+                    icon = Icons.Default.Star,
+                    tint = Color(0xFFF79009)
+                )
+                SummaryMetricCard(
+                    modifier = Modifier.weight(1f),
+                    label = "Care level",
+                    value = parsed.careLevel.prettyCareLevel(),
+                    icon = if (parsed.placeType == "pharmacy") Icons.Default.LocalPharmacy else Icons.Default.Map,
+                    tint = urgencyColor
+                )
+            }
+
+            if (parsed.mapQuery.isNotBlank() && parsed.mapQuery.lowercase() != "none") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = onOpenMap,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(52.dp),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Icon(Icons.Default.Map, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Open Suggested Place")
+                    }
+
+                    OutlinedButton(
+                        onClick = onOpenMap,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(52.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                    ) {
+                        Icon(
+                            imageVector = if (parsed.placeType == "pharmacy") Icons.Default.LocalPharmacy else Icons.Default.Map,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (parsed.placeType == "pharmacy") "Find Pharmacy" else "Find Care",
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SummaryMetricCard(
+    modifier: Modifier = Modifier,
+    label: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tint: Color
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFD)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = tint
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = Color(0xFF667085)
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleSmall,
+                color = Color(0xFF1F2937)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SimpleSectionCard(
+    title: String,
+    items: List<String>,
+    bulletColor: Color
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            HorizontalDivider(color = Color(0xFFE9EEF5))
+
+            items.forEach { item ->
+                Row(
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .padding(top = 6.dp)
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(bulletColor)
+                    )
+
+                    Text(
+                        text = item,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF344054),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WarningCard(
+    warningSigns: List<String>
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF1F1)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = Color(0xFFD92D20)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Seek Care Now If",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color(0xFFB42318)
+                )
+            }
+
+            HorizontalDivider(color = Color(0xFFF4C7C3))
+
+            warningSigns.forEach { item ->
+                Row(
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .padding(top = 6.dp)
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFD92D20))
+                    )
+
+                    Text(
+                        text = item,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF7A271A),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
     }
@@ -1285,7 +1675,9 @@ private fun QuestionCard(
                 Text(
                     text = question,
                     style = MaterialTheme.typography.titleSmall,
-                    color = Color(0xFF1F2937)
+                    color = Color(0xFF1F2937),
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
@@ -1383,7 +1775,7 @@ private fun detectFollowUpType(question: String): FollowUpType {
         q.contains("yes or no") -> FollowUpType.YES_NO
         q.startsWith("do ") || q.startsWith("did ") || q.startsWith("is ") || q.startsWith("are ") || q.startsWith("has ") || q.startsWith("have ") -> FollowUpType.YES_NO
         q.contains("getting worse") || q.contains("better or worse") || q.contains("better, worse") || q.contains("worse, better") || q.contains("staying the same") -> FollowUpType.PROGRESS
-        q.contains("when did it start") || q.contains("how long") || q.contains("how many days") || q.contains("when did this start") -> FollowUpType.DURATION
+        q.contains("when did it start") || q.contains("how long") || q.contains("how many days") || q.contains("when did this start") || q.contains("how long have you") -> FollowUpType.DURATION
         q.contains("how severe") || q.contains("how strong") || q.contains("how intense") -> FollowUpType.SEVERITY
         else -> FollowUpType.TEXT
     }
@@ -1403,6 +1795,14 @@ private fun parseGeminiResponse(text: String): ParsedGeminiResponse {
         return text.substring(contentStart, nextIndex).trim()
     }
 
+    fun singleLineValue(name: String): String {
+        return text.lines()
+            .firstOrNull { it.trim().startsWith("$name:") }
+            ?.substringAfter("$name:")
+            ?.trim()
+            .orEmpty()
+    }
+
     fun bulletList(section: String): List<String> {
         return section.lines()
             .map { it.trim() }
@@ -1416,19 +1816,34 @@ private fun parseGeminiResponse(text: String): ParsedGeminiResponse {
             }
     }
 
-    val urgency = sectionValue(
-        "URGENCY",
-        listOf("SUMMARY", "KEY_POINTS", "NEXT_STEPS", "WARNING_SIGNS", "NOTES")
-    ).ifBlank { "Primary Care" }
+    val urgency = singleLineValue("URGENCY").ifBlank { "Primary Care" }
+    val careLevel = singleLineValue("CARE_LEVEL").ifBlank { "PRIMARY_CARE" }
+    val placeType = singleLineValue("PLACE_TYPE").ifBlank { "primary care" }
+    val mapQuery = singleLineValue("MAP_QUERY").ifBlank { "primary care clinic near me" }
+    val recommendationScore = singleLineValue("RECOMMENDATION_SCORE").toIntOrNull() ?: 3
 
     val summary = sectionValue(
         "SUMMARY",
-        listOf("KEY_POINTS", "NEXT_STEPS", "WARNING_SIGNS", "NOTES")
+        listOf("KEY_POINTS", "SELF_CARE", "OTC_OPTIONS", "NEXT_STEPS", "WARNING_SIGNS", "NOTES")
     ).ifBlank { "No summary available." }
 
     val keyPoints = bulletList(
         sectionValue(
             "KEY_POINTS",
+            listOf("SELF_CARE", "OTC_OPTIONS", "NEXT_STEPS", "WARNING_SIGNS", "NOTES")
+        )
+    )
+
+    val selfCare = bulletList(
+        sectionValue(
+            "SELF_CARE",
+            listOf("OTC_OPTIONS", "NEXT_STEPS", "WARNING_SIGNS", "NOTES")
+        )
+    )
+
+    val otcOptions = bulletList(
+        sectionValue(
+            "OTC_OPTIONS",
             listOf("NEXT_STEPS", "WARNING_SIGNS", "NOTES")
         )
     )
@@ -1454,230 +1869,109 @@ private fun parseGeminiResponse(text: String): ParsedGeminiResponse {
 
     return ParsedGeminiResponse(
         urgency = urgency,
+        careLevel = careLevel,
+        placeType = placeType,
+        mapQuery = mapQuery,
+        recommendationScore = recommendationScore,
         summary = summary,
         keyPoints = if (keyPoints.isEmpty()) listOf("No key points available.") else keyPoints,
+        selfCare = if (selfCare.isEmpty()) listOf("Rest and monitor symptoms.") else selfCare,
+        otcOptions = if (otcOptions.isEmpty()) listOf("Not appropriate without clinician or pharmacist guidance.") else otcOptions,
         nextSteps = if (nextSteps.isEmpty()) listOf("No next steps available.") else nextSteps,
         warningSigns = if (warningSigns.isEmpty()) listOf("No urgent warning signs listed.") else warningSigns,
         notes = notes
     )
 }
 
-@Composable
-private fun UrgencyCard(
-    urgency: String,
-    summary: String
-) {
-    val (bg, chipBg, chipText) = when (urgency.trim()) {
-        "Emergency" -> Triple(Color(0xFFFFF1F1), Color(0xFFD92D20), Color.White)
-        "Urgent Care" -> Triple(Color(0xFFFFF7ED), Color(0xFFF79009), Color.White)
-        "Primary Care" -> Triple(Color(0xFFEFF8FF), Color(0xFF2E90FA), Color.White)
-        else -> Triple(Color(0xFFF6FEF9), Color(0xFF12B76A), Color.White)
-    }
+private fun getBodyOverlaySpec(side: String, useTwoPane: Boolean): BodyOverlaySpec {
+    val bounds = when (side) {
+        "Front" -> if (useTwoPane) {
+            BodyFrameBounds(0.11f, 0.08f, 0.78f, 0.84f)
+        } else {
+            BodyFrameBounds(0.10f, 0.07f, 0.80f, 0.86f)
+        }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = bg),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "Assessment",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color(0xFF1F2937)
-                )
+        "Back" -> if (useTwoPane) {
+            BodyFrameBounds(0.11f, 0.08f, 0.78f, 0.84f)
+        } else {
+            BodyFrameBounds(0.10f, 0.07f, 0.80f, 0.86f)
+        }
 
-                Spacer(modifier = Modifier.weight(1f))
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(chipBg)
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = urgency,
-                        color = chipText,
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                }
-            }
-
-            Text(
-                text = summary,
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color(0xFF344054)
-            )
+        else -> if (useTwoPane) {
+            BodyFrameBounds(0.20f, 0.08f, 0.60f, 0.84f)
+        } else {
+            BodyFrameBounds(0.18f, 0.07f, 0.64f, 0.86f)
         }
     }
-}
 
-@Composable
-private fun SimpleSectionCard(
-    title: String,
-    items: List<String>,
-    cardColor: Color
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = cardColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium
-            )
-
-            HorizontalDivider(color = Color(0xFFE9EEF5))
-
-            items.forEach { item ->
-                Row(
-                    verticalAlignment = Alignment.Top,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .padding(top = 6.dp)
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF7B61FF))
-                    )
-
-                    Text(
-                        text = item,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF344054),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun WarningCard(
-    warningSigns: List<String>
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF1F1)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = "Seek Care Now If",
-                style = MaterialTheme.typography.titleMedium,
-                color = Color(0xFFB42318)
-            )
-
-            HorizontalDivider(color = Color(0xFFF4C7C3))
-
-            warningSigns.forEach { item ->
-                Row(
-                    verticalAlignment = Alignment.Top,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .padding(top = 6.dp)
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFD92D20))
-                    )
-
-                    Text(
-                        text = item,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF7A271A),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-        }
-    }
-}
-
-private fun getHotspotsForSide(side: String): List<BodyHotspot> {
-    return when (side) {
+    val hotspots = when (side) {
         "Front" -> listOf(
-            BodyHotspot("Forehead", 0.dp, (-215).dp, 34.dp),
-            BodyHotspot("Face", 0.dp, (-178).dp, 34.dp),
-            BodyHotspot("Neck", 0.dp, (-138).dp, 30.dp),
-            BodyHotspot("Left Shoulder", (-64).dp, (-108).dp, 32.dp),
-            BodyHotspot("Right Shoulder", 64.dp, (-108).dp, 32.dp),
-            BodyHotspot("Left Chest", (-36).dp, (-76).dp, 36.dp),
-            BodyHotspot("Center Chest", 0.dp, (-70).dp, 36.dp),
-            BodyHotspot("Right Chest", 36.dp, (-76).dp, 36.dp),
-            BodyHotspot("Upper Abdomen", 0.dp, (-8).dp, 40.dp),
-            BodyHotspot("Lower Abdomen", 0.dp, 42.dp, 40.dp),
-            BodyHotspot("Left Arm", (-112).dp, (-18).dp, 34.dp),
-            BodyHotspot("Right Arm", 112.dp, (-18).dp, 34.dp),
-            BodyHotspot("Pelvis", 0.dp, 98.dp, 36.dp),
-            BodyHotspot("Left Thigh", (-34).dp, 160.dp, 34.dp),
-            BodyHotspot("Right Thigh", 34.dp, 160.dp, 34.dp),
-            BodyHotspot("Left Knee", (-34).dp, 230.dp, 30.dp),
-            BodyHotspot("Right Knee", 34.dp, 230.dp, 30.dp),
-            BodyHotspot("Left Shin", (-34).dp, 298.dp, 30.dp),
-            BodyHotspot("Right Shin", 34.dp, 298.dp, 30.dp)
+            BodyHotspot("Forehead", 0.50f, 0.08f, 0.060f),
+            BodyHotspot("Face", 0.50f, 0.15f, 0.060f),
+            BodyHotspot("Neck", 0.50f, 0.23f, 0.055f),
+            BodyHotspot("Left Shoulder", 0.27f, 0.31f, 0.060f),
+            BodyHotspot("Right Shoulder", 0.73f, 0.31f, 0.060f),
+            BodyHotspot("Left Chest", 0.42f, 0.39f, 0.060f),
+            BodyHotspot("Center Chest", 0.50f, 0.40f, 0.060f),
+            BodyHotspot("Right Chest", 0.58f, 0.39f, 0.060f),
+            BodyHotspot("Upper Abdomen", 0.50f, 0.51f, 0.060f),
+            BodyHotspot("Lower Abdomen", 0.50f, 0.61f, 0.060f),
+            BodyHotspot("Left Arm", 0.09f, 0.49f, 0.058f),
+            BodyHotspot("Right Arm", 0.91f, 0.49f, 0.058f),
+            BodyHotspot("Pelvis", 0.50f, 0.70f, 0.058f),
+            BodyHotspot("Left Thigh", 0.45f, 0.81f, 0.056f),
+            BodyHotspot("Right Thigh", 0.55f, 0.81f, 0.056f),
+            BodyHotspot("Left Knee", 0.45f, 0.92f, 0.052f),
+            BodyHotspot("Right Knee", 0.55f, 0.92f, 0.052f),
+            BodyHotspot("Left Shin", 0.45f, 0.98f, 0.050f),
+            BodyHotspot("Right Shin", 0.55f, 0.98f, 0.050f)
         )
 
         "Back" -> listOf(
-            BodyHotspot("Back Head", 0.dp, (-202).dp, 34.dp),
-            BodyHotspot("Back Neck", 0.dp, (-150).dp, 30.dp),
-            BodyHotspot("Left Upper Back", (-42).dp, (-96).dp, 36.dp),
-            BodyHotspot("Right Upper Back", 42.dp, (-96).dp, 36.dp),
-            BodyHotspot("Mid Back", 0.dp, (-26).dp, 40.dp),
-            BodyHotspot("Lower Back", 0.dp, 48.dp, 40.dp),
-            BodyHotspot("Left Elbow Back", (-106).dp, 4.dp, 30.dp),
-            BodyHotspot("Right Elbow Back", 106.dp, 4.dp, 30.dp),
-            BodyHotspot("Left Glute", (-30).dp, 114.dp, 34.dp),
-            BodyHotspot("Right Glute", 30.dp, 114.dp, 34.dp),
-            BodyHotspot("Left Hamstring", (-34).dp, 182.dp, 32.dp),
-            BodyHotspot("Right Hamstring", 34.dp, 182.dp, 32.dp),
-            BodyHotspot("Left Calf", (-34).dp, 278.dp, 30.dp),
-            BodyHotspot("Right Calf", 34.dp, 278.dp, 30.dp)
+            BodyHotspot("Back Head", 0.50f, 0.10f, 0.060f),
+            BodyHotspot("Back Neck", 0.50f, 0.23f, 0.055f),
+            BodyHotspot("Left Upper Back", 0.43f, 0.37f, 0.060f),
+            BodyHotspot("Right Upper Back", 0.57f, 0.37f, 0.060f),
+            BodyHotspot("Mid Back", 0.50f, 0.50f, 0.060f),
+            BodyHotspot("Lower Back", 0.50f, 0.62f, 0.060f),
+            BodyHotspot("Left Elbow Back", 0.10f, 0.51f, 0.055f),
+            BodyHotspot("Right Elbow Back", 0.90f, 0.51f, 0.055f),
+            BodyHotspot("Left Glute", 0.46f, 0.72f, 0.056f),
+            BodyHotspot("Right Glute", 0.54f, 0.72f, 0.056f),
+            BodyHotspot("Left Hamstring", 0.45f, 0.82f, 0.055f),
+            BodyHotspot("Right Hamstring", 0.55f, 0.82f, 0.055f),
+            BodyHotspot("Left Calf", 0.45f, 0.94f, 0.050f),
+            BodyHotspot("Right Calf", 0.55f, 0.94f, 0.050f)
         )
 
         "Left" -> listOf(
-            BodyHotspot("Left Temple", 18.dp, (-188).dp, 30.dp),
-            BodyHotspot("Left Jaw", 20.dp, (-154).dp, 28.dp),
-            BodyHotspot("Left Neck", 14.dp, (-128).dp, 28.dp),
-            BodyHotspot("Left Shoulder Side", 30.dp, (-98).dp, 32.dp),
-            BodyHotspot("Left Rib", 24.dp, (-44).dp, 34.dp),
-            BodyHotspot("Left Waist", 18.dp, 8.dp, 34.dp),
-            BodyHotspot("Left Hip", 14.dp, 74.dp, 34.dp),
-            BodyHotspot("Left Thigh Side", 8.dp, 154.dp, 34.dp),
-            BodyHotspot("Left Knee Side", 6.dp, 232.dp, 30.dp),
-            BodyHotspot("Left Lower Leg", 4.dp, 300.dp, 30.dp)
+            BodyHotspot("Left Temple", 0.55f, 0.10f, 0.055f),
+            BodyHotspot("Left Jaw", 0.56f, 0.17f, 0.052f),
+            BodyHotspot("Left Neck", 0.55f, 0.24f, 0.052f),
+            BodyHotspot("Left Shoulder Side", 0.61f, 0.32f, 0.056f),
+            BodyHotspot("Left Rib", 0.59f, 0.45f, 0.056f),
+            BodyHotspot("Left Waist", 0.57f, 0.56f, 0.055f),
+            BodyHotspot("Left Hip", 0.55f, 0.67f, 0.055f),
+            BodyHotspot("Left Thigh Side", 0.53f, 0.81f, 0.055f),
+            BodyHotspot("Left Knee Side", 0.53f, 0.92f, 0.050f),
+            BodyHotspot("Left Lower Leg", 0.53f, 0.99f, 0.048f)
         )
 
         else -> listOf(
-            BodyHotspot("Right Temple", (-18).dp, (-188).dp, 30.dp),
-            BodyHotspot("Right Jaw", (-20).dp, (-154).dp, 28.dp),
-            BodyHotspot("Right Neck", (-14).dp, (-128).dp, 28.dp),
-            BodyHotspot("Right Shoulder Side", (-30).dp, (-98).dp, 32.dp),
-            BodyHotspot("Right Rib", (-24).dp, (-44).dp, 34.dp),
-            BodyHotspot("Right Waist", (-18).dp, 8.dp, 34.dp),
-            BodyHotspot("Right Hip", (-14).dp, 74.dp, 34.dp),
-            BodyHotspot("Right Thigh Side", (-8).dp, 154.dp, 34.dp),
-            BodyHotspot("Right Knee Side", (-6).dp, 232.dp, 30.dp),
-            BodyHotspot("Right Lower Leg", (-4).dp, 300.dp, 30.dp)
+            BodyHotspot("Right Temple", 0.45f, 0.10f, 0.055f),
+            BodyHotspot("Right Jaw", 0.44f, 0.17f, 0.052f),
+            BodyHotspot("Right Neck", 0.45f, 0.24f, 0.052f),
+            BodyHotspot("Right Shoulder Side", 0.39f, 0.32f, 0.056f),
+            BodyHotspot("Right Rib", 0.41f, 0.45f, 0.056f),
+            BodyHotspot("Right Waist", 0.43f, 0.56f, 0.055f),
+            BodyHotspot("Right Hip", 0.45f, 0.67f, 0.055f),
+            BodyHotspot("Right Thigh Side", 0.47f, 0.81f, 0.055f),
+            BodyHotspot("Right Knee Side", 0.47f, 0.92f, 0.050f),
+            BodyHotspot("Right Lower Leg", 0.47f, 0.99f, 0.048f)
         )
     }
+
+    return BodyOverlaySpec(bounds = bounds, hotspots = hotspots)
 }
 
 private fun getDetailOptions(part: String): List<String> {
@@ -1789,4 +2083,13 @@ private fun getDetailOptions(part: String): List<String> {
             "$part - Soreness"
         )
     }
+}
+
+private fun String.prettyCareLevel(): String {
+    return lowercase()
+        .replace('_', ' ')
+        .split(' ')
+        .joinToString(" ") { token ->
+            token.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        }
 }

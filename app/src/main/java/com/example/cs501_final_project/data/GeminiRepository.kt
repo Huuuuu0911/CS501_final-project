@@ -36,36 +36,55 @@ class GeminiRepository {
         bodyPart: String,
         symptomText: String,
         painLevel: Int,
-        age: String = "",
-        gender: String = "",
-        height: String = "",
-        weight: String = "",
-        address: String = ""
+        patient: PatientContext,
+        recentHistory: List<String>
     ): List<String> {
-        val prompt = """
-            You are helping a student demo medical app.
-            The app needs exactly 3 short follow-up questions before showing a final triage-style response.
-            Do not give the final assessment yet.
-            Do not say you are an AI.
-            Keep the questions short, practical, and easy for a user to answer.
+        val historyText = if (recentHistory.isEmpty()) {
+            "No recent records."
+        } else {
+            recentHistory.joinToString("\n") { "- $it" }
+        }
 
-            Prefer questions that can be answered with:
+        val prompt = """
+            You are generating intake questions for a polished symptom-support app.
+            Goal: ask exactly 3 short, personalized follow-up questions before the final recommendation.
+            Do not give the final assessment yet.
+            Do not mention being an AI.
+            Keep the wording simple, direct, and app-friendly.
+
+            Answer style preferences:
             - yes/no
-            - better/same/worse
+            - better / same / worse
             - today / 1-3 days / more than a week / not sure
             - mild / moderate / severe
 
+            Patient:
+            Name: ${patient.displayName}
+            Group: ${patient.group}
+            Age: ${patient.age}
+            Gender: ${patient.gender}
+            Height: ${patient.height}
+            Weight: ${patient.weight}
+            Address: ${patient.address}
+            Allergies: ${patient.allergies}
+            Current medications: ${patient.medications}
+            Conditions: ${patient.conditions}
+
+            Symptom input:
             Body area: $bodyPart
-            Symptom: $symptomText
-            Pain level from 0 to 10: $painLevel
-            Age: $age
-            Gender: $gender
-            Height: $height
-            Weight: $weight
-            Address: $address
+            Symptom text: $symptomText
+            Pain level 0-10: $painLevel
+
+            Recent symptom history:
+            $historyText
+
+            Rules:
+            - Tailor the 3 questions to the body area, age, conditions, medications, and allergies
+            - Prioritize red flags relevant to the case
+            - Make the questions easy to answer in a mobile app
+            - Avoid repeating the same idea
 
             Return exactly this format:
-
             QUESTION_1: ...
             QUESTION_2: ...
             QUESTION_3: ...
@@ -92,36 +111,55 @@ class GeminiRepository {
         symptomText: String,
         painLevel: Int,
         followUpAnswers: List<String>,
-        age: String = "",
-        gender: String = "",
-        height: String = "",
-        weight: String = "",
-        address: String = ""
+        patient: PatientContext,
+        recentHistory: List<String>
     ): String {
         val answersText = followUpAnswers.joinToString("\n") { "- $it" }
+        val historyText = if (recentHistory.isEmpty()) {
+            "No recent records."
+        } else {
+            recentHistory.joinToString("\n") { "- $it" }
+        }
 
         val prompt = """
-            You are a symptom triage assistant for a student demo medical app.
-            Do not give a final diagnosis.
+            You are a conservative symptom-support assistant for a mobile demo app.
+            This is NOT a diagnosis tool.
             Do not say you are an AI.
-            Write in a clean, app-friendly style.
-            Keep each item short and practical.
+            Write in a clear, practical, calm style.
+            Keep bullets short.
+            Only give general low-risk OTC suggestions. Do not give dosing.
+            If there is any chance the person needs urgent evaluation, say so clearly.
 
-            User selected body area: $bodyPart
+            Patient:
+            Name: ${patient.displayName}
+            Group: ${patient.group}
+            Age: ${patient.age}
+            Gender: ${patient.gender}
+            Height: ${patient.height}
+            Weight: ${patient.weight}
+            Address: ${patient.address}
+            Allergies: ${patient.allergies}
+            Current medications: ${patient.medications}
+            Conditions: ${patient.conditions}
+
+            Symptom input:
+            Body area: $bodyPart
             Symptom description: $symptomText
-            Pain level from 0 to 10: $painLevel
+            Pain level 0-10: $painLevel
+
             Follow-up answers:
             $answersText
 
-            Age: $age
-            Gender: $gender
-            Height: $height
-            Weight: $weight
-            Address: $address
+            Recent symptom history:
+            $historyText
 
-            Return the answer in EXACTLY this format:
+            Return EXACTLY this format:
 
             URGENCY: one of [Emergency | Urgent Care | Primary Care | Self Care]
+            CARE_LEVEL: one of [ER_NOW | URGENT_CARE | PRIMARY_CARE | BUY_OTC | REST_AT_HOME]
+            PLACE_TYPE: one of [hospital | urgent care | primary care | pharmacy | none]
+            MAP_QUERY: short Google Maps search query or none
+            RECOMMENDATION_SCORE: integer from 1 to 5
 
             SUMMARY:
             one short sentence
@@ -130,6 +168,16 @@ class GeminiRepository {
             - point 1
             - point 2
             - point 3
+
+            SELF_CARE:
+            - step 1
+            - step 2
+            - step 3
+
+            OTC_OPTIONS:
+            - option 1
+            - option 2
+            - option 3
 
             NEXT_STEPS:
             - step 1
@@ -146,10 +194,11 @@ class GeminiRepository {
 
             Rules:
             - Never skip a section
-            - Use short bullet points
-            - Keep the tone calm and practical
-            - Warning signs should be specific
-            - Do not add extra headings outside the required format
+            - Never claim a diagnosis
+            - OTC suggestions must be cautious and generic
+            - If OTC options are not appropriate, write "Not appropriate without clinician or pharmacist guidance"
+            - MAP_QUERY must match PLACE_TYPE
+            - Recommendation score 5 means the app is very confident in the place/action category, not a medical certainty
         """.trimIndent()
 
         val text = requestText(prompt)
@@ -160,6 +209,16 @@ class GeminiRepository {
                     "The request completed without usable content",
                     "The service may be busy",
                     "Please try again"
+                ),
+                selfCare = listOf(
+                    "Rest while you retry the request",
+                    "Track any change in symptoms",
+                    "Seek care sooner if symptoms become severe"
+                ),
+                otcOptions = listOf(
+                    "Not appropriate without clinician or pharmacist guidance",
+                    "Not appropriate without clinician or pharmacist guidance",
+                    "Not appropriate without clinician or pharmacist guidance"
                 ),
                 nextSteps = listOf(
                     "Retry in a moment",
@@ -201,7 +260,6 @@ class GeminiRepository {
                 if (!text.isNullOrBlank()) {
                     return text
                 }
-
             } catch (e: HttpException) {
                 val statusCode = e.code()
 
@@ -218,6 +276,16 @@ class GeminiRepository {
                             "Please review the input or prompt",
                             "Try again after checking setup"
                         ),
+                        selfCare = listOf(
+                            "Keep your symptom text clear and short",
+                            "Retry after editing the input",
+                            "Use manual care options if symptoms worsen"
+                        ),
+                        otcOptions = listOf(
+                            "Not appropriate without clinician or pharmacist guidance",
+                            "Not appropriate without clinician or pharmacist guidance",
+                            "Not appropriate without clinician or pharmacist guidance"
+                        ),
                         nextSteps = listOf(
                             "Check request format",
                             "Review API settings",
@@ -232,6 +300,16 @@ class GeminiRepository {
                             "Authentication failed",
                             "The API key may be invalid",
                             "Access may not be enabled"
+                        ),
+                        selfCare = listOf(
+                            "Do not rely on this result until the app setup is fixed",
+                            "Use standard care options if symptoms worsen",
+                            "Seek real-world care for urgent symptoms"
+                        ),
+                        otcOptions = listOf(
+                            "Not appropriate without clinician or pharmacist guidance",
+                            "Not appropriate without clinician or pharmacist guidance",
+                            "Not appropriate without clinician or pharmacist guidance"
                         ),
                         nextSteps = listOf(
                             "Check your Gemini API key",
@@ -248,6 +326,16 @@ class GeminiRepository {
                             "The service asked the app to slow down",
                             "This is usually temporary"
                         ),
+                        selfCare = listOf(
+                            "Wait a moment before retrying",
+                            "Monitor whether symptoms are stable or worsening",
+                            "Do not delay urgent care if warning signs appear"
+                        ),
+                        otcOptions = listOf(
+                            "Not appropriate without clinician or pharmacist guidance",
+                            "Not appropriate without clinician or pharmacist guidance",
+                            "Not appropriate without clinician or pharmacist guidance"
+                        ),
                         nextSteps = listOf(
                             "Wait a moment",
                             "Try again later",
@@ -263,9 +351,19 @@ class GeminiRepository {
                             "Your request did reach the server",
                             "This is usually temporary"
                         ),
+                        selfCare = listOf(
+                            "Keep tracking symptom changes",
+                            "Use the map tab if you already know you need care",
+                            "Escalate to urgent care if warning signs develop"
+                        ),
+                        otcOptions = listOf(
+                            "Not appropriate without clinician or pharmacist guidance",
+                            "Not appropriate without clinician or pharmacist guidance",
+                            "Not appropriate without clinician or pharmacist guidance"
+                        ),
                         nextSteps = listOf(
                             "Try again in a moment",
-                            "Keep your symptom text short and clear",
+                            "Keep symptom text short and clear",
                             "Retry after a short pause"
                         ),
                         notes = "The server returned HTTP 503. This is usually a temporary service issue, not an app UI problem."
@@ -278,6 +376,16 @@ class GeminiRepository {
                             "This may be temporary",
                             "Please try again"
                         ),
+                        selfCare = listOf(
+                            "Keep monitoring your symptoms",
+                            "Use standard care escalation if needed",
+                            "Do not wait if warning signs appear"
+                        ),
+                        otcOptions = listOf(
+                            "Not appropriate without clinician or pharmacist guidance",
+                            "Not appropriate without clinician or pharmacist guidance",
+                            "Not appropriate without clinician or pharmacist guidance"
+                        ),
                         nextSteps = listOf(
                             "Try again later",
                             "Check network connection",
@@ -286,7 +394,6 @@ class GeminiRepository {
                         notes = "The server returned HTTP $statusCode."
                     )
                 }
-
             } catch (e: Exception) {
                 if (attempt == 0) {
                     delay(1000)
@@ -299,6 +406,16 @@ class GeminiRepository {
                         "A network or runtime error happened",
                         "The request did not complete normally",
                         "Please try again"
+                    ),
+                    selfCare = listOf(
+                        "If symptoms are stable, retry later",
+                        "If symptoms are severe, use urgent care or emergency services",
+                        "Track any new warning signs"
+                    ),
+                    otcOptions = listOf(
+                        "Not appropriate without clinician or pharmacist guidance",
+                        "Not appropriate without clinician or pharmacist guidance",
+                        "Not appropriate without clinician or pharmacist guidance"
                     ),
                     nextSteps = listOf(
                         "Check internet connection",
@@ -316,6 +433,16 @@ class GeminiRepository {
                 "The request completed without usable content",
                 "The service may be busy",
                 "Please try again"
+            ),
+            selfCare = listOf(
+                "Rest while you retry the request",
+                "Track any change in symptoms",
+                "Seek care sooner if symptoms become severe"
+            ),
+            otcOptions = listOf(
+                "Not appropriate without clinician or pharmacist guidance",
+                "Not appropriate without clinician or pharmacist guidance",
+                "Not appropriate without clinician or pharmacist guidance"
             ),
             nextSteps = listOf(
                 "Retry in a moment",
@@ -336,8 +463,14 @@ class GeminiRepository {
 
     private fun structuredFallback(
         urgency: String = "Primary Care",
+        careLevel: String = "PRIMARY_CARE",
+        placeType: String = "primary care",
+        mapQuery: String = "primary care clinic near me",
+        recommendationScore: Int = 3,
         summary: String,
         keyPoints: List<String>,
+        selfCare: List<String>,
+        otcOptions: List<String>,
         nextSteps: List<String>,
         warningSigns: List<String> = listOf(
             "Severe pain",
@@ -348,6 +481,10 @@ class GeminiRepository {
     ): String {
         return """
             URGENCY: $urgency
+            CARE_LEVEL: $careLevel
+            PLACE_TYPE: $placeType
+            MAP_QUERY: $mapQuery
+            RECOMMENDATION_SCORE: $recommendationScore
 
             SUMMARY:
             $summary
@@ -356,6 +493,16 @@ class GeminiRepository {
             - ${keyPoints.getOrElse(0) { "No key point" }}
             - ${keyPoints.getOrElse(1) { "No key point" }}
             - ${keyPoints.getOrElse(2) { "No key point" }}
+
+            SELF_CARE:
+            - ${selfCare.getOrElse(0) { "Rest and monitor symptoms" }}
+            - ${selfCare.getOrElse(1) { "Use caution with new symptoms" }}
+            - ${selfCare.getOrElse(2) { "Seek care if warning signs appear" }}
+
+            OTC_OPTIONS:
+            - ${otcOptions.getOrElse(0) { "Not appropriate without clinician or pharmacist guidance" }}
+            - ${otcOptions.getOrElse(1) { "Not appropriate without clinician or pharmacist guidance" }}
+            - ${otcOptions.getOrElse(2) { "Not appropriate without clinician or pharmacist guidance" }}
 
             NEXT_STEPS:
             - ${nextSteps.getOrElse(0) { "Try again later" }}

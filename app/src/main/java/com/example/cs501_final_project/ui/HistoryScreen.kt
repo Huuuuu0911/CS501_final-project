@@ -16,8 +16,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Card
@@ -25,13 +27,14 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,69 +42,24 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-
-private data class HistoryRecord(
-    val personName: String,
-    val group: String,
-    val date: String,
-    val concern: String,
-    val area: String,
-    val urgency: String,
-    val summary: String
-)
+import com.example.cs501_final_project.data.CareRouteViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
-fun HistoryScreen() {
-    val bgColor = Color(0xFFF6F8FC)
-    var filter by remember { mutableStateOf("All") }
+fun HistoryScreen(
+    viewModel: CareRouteViewModel,
+    onOpenMap: (String) -> Unit
+) {
+    val bgColor = MaterialTheme.colorScheme.background
+    var filter by rememberSaveable { mutableStateOf("All") }
 
-    val records = remember {
-        listOf(
-            HistoryRecord(
-                personName = "You",
-                group = "Mine",
-                date = "Today · 10:40 AM",
-                concern = "Chest tightness",
-                area = "Center Chest",
-                urgency = "Primary Care",
-                summary = "Pain happens mainly during deep breathing and has been stable."
-            ),
-            HistoryRecord(
-                personName = "You",
-                group = "Mine",
-                date = "Apr 10 · 8:15 PM",
-                concern = "Lower back pain",
-                area = "Lower Back",
-                urgency = "Self Care",
-                summary = "Likely related to sitting posture and muscle strain after study hours."
-            ),
-            HistoryRecord(
-                personName = "Mom",
-                group = "Family",
-                date = "Apr 08 · 6:30 PM",
-                concern = "Knee swelling",
-                area = "Right Knee",
-                urgency = "Urgent Care",
-                summary = "Swelling increased after walking and family wanted a faster check."
-            ),
-            HistoryRecord(
-                personName = "Dad",
-                group = "Family",
-                date = "Apr 05 · 7:10 AM",
-                concern = "Shoulder soreness",
-                area = "Left Shoulder",
-                urgency = "Self Care",
-                summary = "Pain was mild and improved after rest and limited activity."
-            )
-        )
-    }
-
-    val filteredRecords = remember(filter, records) {
-        when (filter) {
-            "Mine" -> records.filter { it.group == "Mine" }
-            "Family" -> records.filter { it.group == "Family" }
-            else -> records
-        }
+    val records = viewModel.historyRecords.toList()
+    val filteredRecords = when (filter) {
+        "Mine" -> records.filter { it.personGroup == "Mine" }
+        "Family" -> records.filter { it.personGroup == "Family" }
+        else -> records
     }
 
     Surface(
@@ -120,11 +78,10 @@ fun HistoryScreen() {
                 Text(
                     text = "History",
                     style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF111827)
+                    fontWeight = FontWeight.ExtraBold
                 )
                 Text(
-                    text = "View your own checks and family records in one timeline.",
+                    text = "Real records saved from the follow-up result flow. You can filter and delete them here.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color(0xFF667085)
                 )
@@ -137,21 +94,21 @@ fun HistoryScreen() {
                 SummaryCountCard(
                     modifier = Modifier.weight(1f),
                     title = "Mine",
-                    value = records.count { it.group == "Mine" }.toString(),
+                    value = records.count { it.personGroup == "Mine" }.toString(),
                     icon = Icons.Default.Person,
                     accent = Color(0xFF4F8EEB)
                 )
                 SummaryCountCard(
                     modifier = Modifier.weight(1f),
                     title = "Family",
-                    value = records.count { it.group == "Family" }.toString(),
+                    value = records.count { it.personGroup == "Family" }.toString(),
                     icon = Icons.Default.Groups,
                     accent = Color(0xFF12B76A)
                 )
                 SummaryCountCard(
                     modifier = Modifier.weight(1f),
-                    title = "Recent",
-                    value = "7d",
+                    title = "Saved",
+                    value = records.size.toString(),
                     icon = Icons.Default.Schedule,
                     accent = Color(0xFF7B61FF)
                 )
@@ -160,7 +117,7 @@ fun HistoryScreen() {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
             ) {
                 Column(
@@ -192,7 +149,7 @@ fun HistoryScreen() {
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = Color(0xFFEAE6FF),
                                     selectedLabelColor = Color(0xFF4B3BC8),
-                                    containerColor = Color(0xFFF6F8FC),
+                                    containerColor = MaterialTheme.colorScheme.surface,
                                     labelColor = Color(0xFF48556A)
                                 )
                             )
@@ -201,32 +158,51 @@ fun HistoryScreen() {
                 }
             }
 
-            filteredRecords.forEach { record ->
-                HistoryRecordCard(record = record)
-            }
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFD)),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "Next Upgrade",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "When you connect this screen to saved Follow-up results, these cards can become a real timeline with search, family filters, and repeat-symptom trends.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF667085)
+            if (filteredRecords.isEmpty()) {
+                EmptyHistoryCard()
+            } else {
+                filteredRecords.forEach { record ->
+                    HistoryRecordCard(
+                        record = record,
+                        onDelete = { viewModel.deleteHistoryRecord(record.id) },
+                        onOpenMap = {
+                            onOpenMap(
+                                if (record.mapQuery.isBlank()) {
+                                    "${record.urgency} care near me"
+                                } else {
+                                    record.mapQuery
+                                }
+                            )
+                        }
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun EmptyHistoryCard() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "No history yet",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Complete a symptom check and final assessment. The result will be saved here automatically.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF667085)
+            )
         }
     }
 }
@@ -242,7 +218,7 @@ private fun SummaryCountCard(
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
@@ -257,8 +233,7 @@ private fun SummaryCountCard(
             Text(
                 text = value,
                 style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color(0xFF111827)
+                fontWeight = FontWeight.ExtraBold
             )
             Text(
                 text = title,
@@ -270,17 +245,25 @@ private fun SummaryCountCard(
 }
 
 @Composable
-private fun HistoryRecordCard(record: HistoryRecord) {
+private fun HistoryRecordCard(
+    record: com.example.cs501_final_project.data.SavedCheckRecord,
+    onDelete: () -> Unit,
+    onOpenMap: () -> Unit
+) {
     val urgencyColor = when (record.urgency) {
+        "Emergency" -> Color(0xFFD92D20)
         "Urgent Care" -> Color(0xFFF79009)
         "Primary Care" -> Color(0xFF2E90FA)
         else -> Color(0xFF12B76A)
     }
 
+    val formattedTime = SimpleDateFormat("MMM dd · h:mm a", Locale.getDefault())
+        .format(Date(record.createdAt))
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(26.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
     ) {
         Column(
@@ -295,11 +278,10 @@ private fun HistoryRecordCard(record: HistoryRecord) {
                     Text(
                         text = record.personName,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF111827)
+                        fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = record.date,
+                        text = "$formattedTime · ${record.personGroup}",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFF667085)
                     )
@@ -323,34 +305,44 @@ private fun HistoryRecordCard(record: HistoryRecord) {
             }
 
             Text(
-                text = record.concern,
+                text = "${record.bodyPart} · Pain ${record.painLevel}/10",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF1F2937)
             )
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF7B61FF))
-                )
-                Text(
-                    text = record.area,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF344054)
-                )
-            }
+            Text(
+                text = record.symptomText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF344054)
+            )
 
             Text(
                 text = record.summary,
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color(0xFF667085)
             )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                IconButton(onClick = onOpenMap) {
+                    Icon(
+                        imageVector = Icons.Default.Map,
+                        contentDescription = "Open map",
+                        tint = Color(0xFF12B76A)
+                    )
+                }
+
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete record",
+                        tint = Color(0xFFD92D20)
+                    )
+                }
+            }
         }
     }
 }
