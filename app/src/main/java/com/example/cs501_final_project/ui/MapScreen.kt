@@ -3,6 +3,7 @@ package com.example.cs501_final_project.ui
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -34,9 +36,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -44,21 +46,22 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.MapUiSettings
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.rememberCameraPositionState
 
 @Composable
 fun MapScreen() {
     val context = LocalContext.current
     val bgColor = Color(0xFFF6F8FC)
+
     var searchText by rememberSaveable { mutableStateOf("") }
     var selectedCategory by rememberSaveable { mutableStateOf("Hospital") }
-
-    fun openMapQuery(query: String) {
-        val intent = Intent(
-            Intent.ACTION_VIEW,
-            Uri.parse("geo:0,0?q=${Uri.encode(query)}")
-        )
-        context.startActivity(intent)
-    }
 
     val quickCategories = remember {
         listOf("Hospital", "Pharmacy", "Urgent Care", "Checkup Center")
@@ -70,6 +73,38 @@ fun MapScreen() {
             Color(0xFFF3F0FF)
         )
     )
+
+    val defaultCenter = remember {
+        LatLng(42.3505, -71.1054)
+    }
+
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(defaultCenter, 13f)
+    }
+
+    val mapUiSettings = remember {
+        MapUiSettings(
+            zoomControlsEnabled = false,
+            compassEnabled = true,
+            mapToolbarEnabled = true,
+            rotationGesturesEnabled = true,
+            scrollGesturesEnabled = true,
+            tiltGesturesEnabled = true,
+            zoomGesturesEnabled = true
+        )
+    }
+
+    val mapProperties = remember {
+        MapProperties(isBuildingEnabled = true)
+    }
+
+    fun openMapQuery(query: String) {
+        val intent = Intent(
+            Intent.ACTION_VIEW,
+            Uri.parse("geo:0,0?q=${Uri.encode(query)}")
+        )
+        context.startActivity(intent)
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -132,7 +167,12 @@ fun MapScreen() {
                         singleLine = true
                     )
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         quickCategories.forEach { category ->
                             FilterChip(
                                 selected = selectedCategory == category,
@@ -144,6 +184,32 @@ fun MapScreen() {
                                     containerColor = Color.White,
                                     labelColor = Color(0xFF48556A)
                                 )
+                            )
+                        }
+                    }
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(320.dp),
+                        shape = RoundedCornerShape(22.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        GoogleMap(
+                            modifier = Modifier.fillMaxSize(),
+                            cameraPositionState = cameraPositionState,
+                            properties = mapProperties,
+                            uiSettings = mapUiSettings
+                        ) {
+                            Marker(
+                                state = MarkerState(position = defaultCenter),
+                                title = "CareRoute Map",
+                                snippet = if (searchText.isBlank()) {
+                                    "$selectedCategory search area"
+                                } else {
+                                    searchText
+                                }
                             )
                         }
                     }
@@ -161,7 +227,9 @@ fun MapScreen() {
                             .fillMaxWidth()
                             .height(54.dp),
                         shape = RoundedCornerShape(18.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF12B76A))
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF12B76A)
+                        )
                     ) {
                         Text("Open Nearby Search")
                     }
@@ -178,15 +246,24 @@ fun MapScreen() {
                     subtitle = "Emergency and general care",
                     icon = Icons.Default.LocalHospital,
                     accent = Color(0xFF4F8EEB),
-                    onClick = { openMapQuery("hospital near me") }
+                    onClick = {
+                        selectedCategory = "Hospital"
+                        searchText = "hospital"
+                        openMapQuery("hospital near me")
+                    }
                 )
+
                 QuickMapCard(
                     modifier = Modifier.weight(1f),
                     title = "Pharmacy",
                     subtitle = "Prescription and OTC help",
                     icon = Icons.Default.Medication,
                     accent = Color(0xFF7B61FF),
-                    onClick = { openMapQuery("pharmacy near me") }
+                    onClick = {
+                        selectedCategory = "Pharmacy"
+                        searchText = "pharmacy"
+                        openMapQuery("pharmacy near me")
+                    }
                 )
             }
 
@@ -200,15 +277,24 @@ fun MapScreen() {
                     subtitle = "Faster walk-in options",
                     icon = Icons.Default.MedicalServices,
                     accent = Color(0xFFF79009),
-                    onClick = { openMapQuery("urgent care near me") }
+                    onClick = {
+                        selectedCategory = "Urgent Care"
+                        searchText = "urgent care"
+                        openMapQuery("urgent care near me")
+                    }
                 )
+
                 QuickMapCard(
                     modifier = Modifier.weight(1f),
                     title = "Checkup Center",
                     subtitle = "Routine screening visits",
                     icon = Icons.Default.Place,
                     accent = Color(0xFF12B76A),
-                    onClick = { openMapQuery("checkup center near me") }
+                    onClick = {
+                        selectedCategory = "Checkup Center"
+                        searchText = "checkup center"
+                        openMapQuery("checkup center near me")
+                    }
                 )
             }
 
@@ -234,8 +320,9 @@ fun MapScreen() {
                             fontWeight = FontWeight.Bold
                         )
                     }
+
                     Text(
-                        text = "You can later expand this page with clinic ratings, insurance filters, open-now status, pediatric search, and saved favorite hospitals.",
+                        text = "This page now shows an embedded map directly in the app, while the green button still opens Google Maps for a real nearby search.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color(0xFF667085)
                     )
@@ -270,11 +357,13 @@ private fun QuickMapCard(
                 contentDescription = null,
                 tint = accent
             )
+
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
+
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,

@@ -69,6 +69,8 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("io.github.sceneview:sceneview:3.6.2")
     implementation("androidx.navigation:navigation-compose:2.7.7")
+
+    implementation("com.google.android.gms:play-services-maps:20.0.0")
     implementation("com.google.maps.android:maps-compose:6.12.0")
     implementation("com.google.android.libraries.places:places:5.1.1")
     implementation("com.google.android.gms:play-services-location:21.3.0")
