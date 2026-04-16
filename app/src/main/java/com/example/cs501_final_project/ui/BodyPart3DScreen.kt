@@ -372,7 +372,7 @@ private fun ModelViewerCard(
                         )?.let { modelInstance ->
                             ModelNode(
                                 modelInstance = modelInstance,
-                                scaleToUnits = 0.65f,
+                                scaleToUnits = 0.72f,
                                 rotation = Rotation(y = rotationY)
                             )
                         }
@@ -1886,9 +1886,9 @@ private fun parseGeminiResponse(text: String): ParsedGeminiResponse {
 private fun getBodyOverlaySpec(side: String, useTwoPane: Boolean): BodyOverlaySpec {
     val bounds = when (side) {
         "Front" -> if (useTwoPane) {
-            BodyFrameBounds(0.11f, 0.08f, 0.78f, 0.84f)
+            BodyFrameBounds(0.17f, 0.07f, 0.66f, 0.87f)
         } else {
-            BodyFrameBounds(0.10f, 0.07f, 0.80f, 0.86f)
+            BodyFrameBounds(0.18f, 0.07f, 0.64f, 0.87f)
         }
 
         "Back" -> if (useTwoPane) {
@@ -1906,25 +1906,33 @@ private fun getBodyOverlaySpec(side: String, useTwoPane: Boolean): BodyOverlaySp
 
     val hotspots = when (side) {
         "Front" -> listOf(
-            BodyHotspot("Forehead", 0.50f, 0.08f, 0.060f),
-            BodyHotspot("Face", 0.50f, 0.15f, 0.060f),
-            BodyHotspot("Neck", 0.50f, 0.23f, 0.055f),
-            BodyHotspot("Left Shoulder", 0.27f, 0.31f, 0.060f),
-            BodyHotspot("Right Shoulder", 0.73f, 0.31f, 0.060f),
-            BodyHotspot("Left Chest", 0.42f, 0.39f, 0.060f),
-            BodyHotspot("Center Chest", 0.50f, 0.40f, 0.060f),
-            BodyHotspot("Right Chest", 0.58f, 0.39f, 0.060f),
-            BodyHotspot("Upper Abdomen", 0.50f, 0.51f, 0.060f),
-            BodyHotspot("Lower Abdomen", 0.50f, 0.61f, 0.060f),
-            BodyHotspot("Left Arm", 0.09f, 0.49f, 0.058f),
-            BodyHotspot("Right Arm", 0.91f, 0.49f, 0.058f),
-            BodyHotspot("Pelvis", 0.50f, 0.70f, 0.058f),
-            BodyHotspot("Left Thigh", 0.45f, 0.81f, 0.056f),
-            BodyHotspot("Right Thigh", 0.55f, 0.81f, 0.056f),
-            BodyHotspot("Left Knee", 0.45f, 0.92f, 0.052f),
-            BodyHotspot("Right Knee", 0.55f, 0.92f, 0.052f),
-            BodyHotspot("Left Shin", 0.45f, 0.98f, 0.050f),
-            BodyHotspot("Right Shin", 0.55f, 0.98f, 0.050f)
+            BodyHotspot("Forehead", 0.50f, 0.10f, 0.058f),
+            BodyHotspot("Face", 0.50f, 0.17f, 0.058f),
+            BodyHotspot("Neck", 0.50f, 0.25f, 0.054f),
+
+            BodyHotspot("Left Shoulder", 0.31f, 0.33f, 0.058f),
+            BodyHotspot("Right Shoulder", 0.69f, 0.33f, 0.058f),
+
+            BodyHotspot("Left Chest", 0.43f, 0.39f, 0.056f),
+            BodyHotspot("Center Chest", 0.50f, 0.41f, 0.056f),
+            BodyHotspot("Right Chest", 0.57f, 0.39f, 0.056f),
+
+            BodyHotspot("Upper Abdomen", 0.50f, 0.52f, 0.056f),
+            BodyHotspot("Lower Abdomen", 0.50f, 0.61f, 0.056f),
+
+            BodyHotspot("Left Arm", 0.16f, 0.50f, 0.056f),
+            BodyHotspot("Right Arm", 0.84f, 0.50f, 0.056f),
+
+            BodyHotspot("Pelvis", 0.50f, 0.69f, 0.056f),
+
+            BodyHotspot("Left Thigh", 0.44f, 0.80f, 0.054f),
+            BodyHotspot("Right Thigh", 0.56f, 0.80f, 0.054f),
+
+            BodyHotspot("Left Knee", 0.45f, 0.91f, 0.050f),
+            BodyHotspot("Right Knee", 0.55f, 0.91f, 0.050f),
+
+            BodyHotspot("Left Shin", 0.46f, 0.985f, 0.048f),
+            BodyHotspot("Right Shin", 0.54f, 0.985f, 0.048f)
         )
 
         "Back" -> listOf(
