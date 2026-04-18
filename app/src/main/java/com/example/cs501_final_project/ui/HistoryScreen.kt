@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -73,10 +74,6 @@ import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Locale
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.width
-import androidx.compose.ui.text.input.KeyboardType
 
 private enum class HistoryFilterOption {
     ALL,
@@ -598,7 +595,6 @@ private fun ManualRecordDialog(
                     label = { Text("Summary or note") },
                     placeholder = { Text("Write your past diagnosis, note from a clinician, or key details from a previous visit...") },
                     shape = RoundedCornerShape(16.dp),
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
                 )
             }
         },
