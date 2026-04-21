@@ -293,16 +293,30 @@ app/
     │   │   └── SelfProfileEntity.kt
     │   ├── preferences/
     │   │   └── AppPreferencesRepository.kt
+    │   └── AppModels.kt
+    │   └── AuthModels.kt
+    │   └── AuthViewModel.kt
     │   └── CareRouteViewModel.kt
+    │   └── GeminiRepository.kt
     ├── navigation/
     │   └── AppNav.kt
+    ├── network/
+    │   └── GeminiApiService.kt
+    │   └── GeminiModels.kt
     ├── ui/
-    │   ├── HomeScreen.kt
+    │   ├── components/
+    │   │   ├── AppButton.kt
+    │   │   └── AppCard.kt
+    │   ├── theme/
+    │   │   ├── CareRouteTheme.kt
+    │   │   └── Color.kt
+    │   ├── AuthScreen.kt
+    │   ├── BodyPart3DScreen.kt
+    │   ├── BodyPartScreen.kt
     │   ├── HistoryScreen.kt
+    │   ├── HomeScreen.kt
     │   ├── MapScreen.kt
     │   ├── ResultScreen.kt
     │   ├── SettingScreen.kt
-    │   ├── BodyPartScreen.kt
-    │   ├── BodyPart3DScreen.kt
-    │   └── components/
+    │   └── TriageScreen.kt
     └── MainActivity.kt
