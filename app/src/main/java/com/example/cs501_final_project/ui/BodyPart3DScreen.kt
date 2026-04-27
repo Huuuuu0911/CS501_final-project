@@ -112,6 +112,69 @@ private data class BodyOverlaySpec(
     val hotspots: List<BodyHotspot>
 )
 
+// ===== 衣服叠加层(在 3D 模型之上、热点之下渲染) =====
+private data class ClothingPiece(
+    val xRatio: Float,         // 中心点 x(相对 body frame)
+    val yRatio: Float,         // 顶边 y(相对 body frame)
+    val widthRatio: Float,
+    val heightRatio: Float,
+    val color: Color,
+    val cornerRadius: Dp = 18.dp
+)
+
+private fun getClothingForSide(side: String): List<ClothingPiece> {
+    val tShirtColor = Color(0xFF64748B)   // 蓝灰
+    val shortsColor = Color(0xFF1F2937)   // 深色
+
+    return when (side) {
+        "Front", "Back" -> listOf(
+            // T-shirt: 肩膀下方 → 腰部
+            ClothingPiece(
+                xRatio = 0.50f,
+                yRatio = 0.18f,
+                widthRatio = 0.50f,
+                heightRatio = 0.30f,
+                color = tShirtColor,
+                cornerRadius = 22.dp
+            ),
+            // 短裤: 腰部 → 大腿中段
+            ClothingPiece(
+                xRatio = 0.50f,
+                yRatio = 0.48f,
+                widthRatio = 0.42f,
+                heightRatio = 0.17f,
+                color = shortsColor,
+                cornerRadius = 14.dp
+            )
+        )
+
+        "Left", "Right" -> {
+            // 侧视图身体更窄,衣服跟着收窄并轻微偏移
+            val centerX = if (side == "Left") 0.55f else 0.45f
+            listOf(
+                ClothingPiece(
+                    xRatio = centerX,
+                    yRatio = 0.30f,
+                    widthRatio = 0.18f,
+                    heightRatio = 0.28f,
+                    color = tShirtColor,
+                    cornerRadius = 18.dp
+                ),
+                ClothingPiece(
+                    xRatio = centerX,
+                    yRatio = 0.58f,
+                    widthRatio = 0.16f,
+                    heightRatio = 0.17f,
+                    color = shortsColor,
+                    cornerRadius = 12.dp
+                )
+            )
+        }
+
+        else -> emptyList()
+    }
+}
+
 data class ParsedGeminiResponse(
     val urgency: String,
     val careLevel: String,
@@ -378,6 +441,12 @@ private fun ModelViewerCard(
                         }
                     }
 
+                    // 衣服叠加层(在 3D 模型之上、热点之下,不拦截点击)
+                    ClothingOverlay(
+                        overlaySpec = overlaySpec,
+                        side = currentSide
+                    )
+
                     HotspotOverlay(
                         overlaySpec = overlaySpec,
                         onTap = { part ->
@@ -502,6 +571,46 @@ private fun ChipRows(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ClothingOverlay(
+    overlaySpec: BodyOverlaySpec,
+    side: String
+) {
+    val density = LocalDensity.current
+    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onSizeChanged { canvasSize = it }
+    ) {
+        if (canvasSize.width == 0 || canvasSize.height == 0) return@Box
+
+        val bodyFrameLeft = canvasSize.width * overlaySpec.bounds.leftRatio
+        val bodyFrameTop = canvasSize.height * overlaySpec.bounds.topRatio
+        val bodyFrameWidth = canvasSize.width * overlaySpec.bounds.widthRatio
+        val bodyFrameHeight = canvasSize.height * overlaySpec.bounds.heightRatio
+
+        getClothingForSide(side).forEach { piece ->
+            val widthPx = bodyFrameWidth * piece.widthRatio
+            val heightPx = bodyFrameHeight * piece.heightRatio
+            val xPx = bodyFrameLeft + (bodyFrameWidth * piece.xRatio) - (widthPx / 2f)
+            val yPx = bodyFrameTop + (bodyFrameHeight * piece.yRatio)
+
+            Box(
+                modifier = Modifier
+                    .offset { IntOffset(xPx.roundToInt(), yPx.roundToInt()) }
+                    .size(
+                        width = with(density) { widthPx.toDp() },
+                        height = with(density) { heightPx.toDp() }
+                    )
+                    .clip(RoundedCornerShape(piece.cornerRadius))
+                    .background(piece.color.copy(alpha = 0.88f))
+            )
         }
     }
 }
