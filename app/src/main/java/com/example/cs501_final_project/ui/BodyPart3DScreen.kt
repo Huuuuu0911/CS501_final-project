@@ -1022,44 +1022,47 @@ private fun DrawScope.drawFittedBoxerBriefs(
     val h = height
 
     val waistH = h * 0.16f
-    val bottomY = y + h
     val bodyTop = y + waistH
 
+    // 更往外扩的 boxer briefs 外轮廓
     val bodyPath = Path().apply {
-        moveTo(x + w * 0.06f, bodyTop)
+        moveTo(x + w * 0.04f, bodyTop)
 
+        // 上边从左到右，保持轻微弧度
         cubicTo(
-            x + w * 0.20f, y + h * 0.15f,
-            x + w * 0.80f, y + h * 0.15f,
-            x + w * 0.94f, bodyTop
+            x + w * 0.16f, y + h * 0.12f,
+            x + w * 0.84f, y + h * 0.12f,
+            x + w * 0.96f, bodyTop
         )
 
+        // 右外侧：往外扩，不再往里收
         cubicTo(
-            x + w * 0.98f, y + h * 0.38f,
-            x + w * 0.91f, y + h * 0.76f,
-            x + w * 0.82f, y + h * 0.96f
+            x + w * 1.02f, y + h * 0.34f,
+            x + w * 0.96f, y + h * 0.72f,
+            x + w * 0.84f, y + h * 0.96f
         )
 
-        lineTo(x + w * 0.58f, y + h * 0.96f)
-
+        // 右腿内侧到裆部
+        lineTo(x + w * 0.60f, y + h * 0.96f)
         cubicTo(
-            x + w * 0.56f, y + h * 0.79f,
-            x + w * 0.54f, y + h * 0.66f,
-            x + w * 0.50f, y + h * 0.58f
+            x + w * 0.57f, y + h * 0.80f,
+            x + w * 0.55f, y + h * 0.67f,
+            x + w * 0.50f, y + h * 0.57f
         )
 
+        // 左腿内侧
         cubicTo(
-            x + w * 0.46f, y + h * 0.66f,
-            x + w * 0.44f, y + h * 0.79f,
-            x + w * 0.42f, y + h * 0.96f
+            x + w * 0.45f, y + h * 0.67f,
+            x + w * 0.43f, y + h * 0.80f,
+            x + w * 0.40f, y + h * 0.96f
         )
 
-        lineTo(x + w * 0.18f, y + h * 0.96f)
-
+        // 左外腿
+        lineTo(x + w * 0.16f, y + h * 0.96f)
         cubicTo(
-            x + w * 0.09f, y + h * 0.76f,
-            x + w * 0.02f, y + h * 0.38f,
-            x + w * 0.06f, bodyTop
+            x + w * 0.04f, y + h * 0.72f,
+            x - w * 0.02f, y + h * 0.34f,
+            x + w * 0.04f, bodyTop
         )
 
         close()
@@ -1067,33 +1070,35 @@ private fun DrawScope.drawFittedBoxerBriefs(
 
     drawPath(bodyPath, mainColor)
 
+    // 左侧深色 panel，也跟着往外扩
     val leftPanel = Path().apply {
-        moveTo(x + w * 0.06f, bodyTop)
+        moveTo(x + w * 0.05f, bodyTop)
         cubicTo(
-            x + w * 0.12f, y + h * 0.40f,
-            x + w * 0.13f, y + h * 0.73f,
-            x + w * 0.18f, y + h * 0.96f
+            x + w * 0.10f, y + h * 0.34f,
+            x + w * 0.10f, y + h * 0.70f,
+            x + w * 0.16f, y + h * 0.96f
         )
-        lineTo(x + w * 0.36f, y + h * 0.96f)
+        lineTo(x + w * 0.34f, y + h * 0.96f)
         cubicTo(
-            x + w * 0.31f, y + h * 0.72f,
-            x + w * 0.28f, y + h * 0.42f,
+            x + w * 0.30f, y + h * 0.72f,
+            x + w * 0.28f, y + h * 0.40f,
             x + w * 0.29f, bodyTop
         )
         close()
     }
 
+    // 右侧深色 panel
     val rightPanel = Path().apply {
-        moveTo(x + w * 0.94f, bodyTop)
+        moveTo(x + w * 0.95f, bodyTop)
         cubicTo(
-            x + w * 0.88f, y + h * 0.40f,
-            x + w * 0.87f, y + h * 0.73f,
-            x + w * 0.82f, y + h * 0.96f
+            x + w * 0.90f, y + h * 0.34f,
+            x + w * 0.90f, y + h * 0.70f,
+            x + w * 0.84f, y + h * 0.96f
         )
-        lineTo(x + w * 0.64f, y + h * 0.96f)
+        lineTo(x + w * 0.66f, y + h * 0.96f)
         cubicTo(
-            x + w * 0.69f, y + h * 0.72f,
-            x + w * 0.72f, y + h * 0.42f,
+            x + w * 0.70f, y + h * 0.72f,
+            x + w * 0.72f, y + h * 0.40f,
             x + w * 0.71f, bodyTop
         )
         close()
@@ -1117,8 +1122,9 @@ private fun DrawScope.drawFittedBoxerBriefs(
         close()
     }
 
-    drawPath(pouchPath, Color(0xFF4B5563).copy(alpha = 0.45f))
+    drawPath(pouchPath, Color(0xFF4B5563).copy(alpha = 0.42f))
 
+    // 腰带
     drawRoundRect(
         color = waistColor,
         topLeft = Offset(x, y),
@@ -1126,12 +1132,14 @@ private fun DrawScope.drawFittedBoxerBriefs(
         cornerRadius = CornerRadius(w * 0.08f, w * 0.08f)
     )
 
+    // 腰带高光
     drawRect(
         color = Color.White.copy(alpha = 0.10f),
         topLeft = Offset(x, y + waistH * 0.18f),
         size = Size(w, waistH * 0.18f)
     )
 
+    // 中间缝线
     drawLine(
         color = seamColor,
         start = Offset(x + w * 0.50f, bodyTop + h * 0.03f),
@@ -1139,17 +1147,18 @@ private fun DrawScope.drawFittedBoxerBriefs(
         strokeWidth = w * 0.012f
     )
 
+    // 左右裆部缝线
     drawLine(
-        color = Color.Black.copy(alpha = 0.25f),
-        start = Offset(x + w * 0.42f, y + h * 0.96f),
-        end = Offset(x + w * 0.50f, y + h * 0.58f),
+        color = Color.Black.copy(alpha = 0.22f),
+        start = Offset(x + w * 0.40f, y + h * 0.96f),
+        end = Offset(x + w * 0.50f, y + h * 0.57f),
         strokeWidth = w * 0.010f
     )
 
     drawLine(
-        color = Color.Black.copy(alpha = 0.25f),
-        start = Offset(x + w * 0.58f, y + h * 0.96f),
-        end = Offset(x + w * 0.50f, y + h * 0.58f),
+        color = Color.Black.copy(alpha = 0.22f),
+        start = Offset(x + w * 0.60f, y + h * 0.96f),
+        end = Offset(x + w * 0.50f, y + h * 0.57f),
         strokeWidth = w * 0.010f
     )
 }
