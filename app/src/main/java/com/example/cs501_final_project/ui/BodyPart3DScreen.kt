@@ -9,6 +9,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -67,8 +68,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -111,69 +117,6 @@ private data class BodyOverlaySpec(
     val bounds: BodyFrameBounds,
     val hotspots: List<BodyHotspot>
 )
-
-// ===== 衣服叠加层(在 3D 模型之上、热点之下渲染) =====
-private data class ClothingPiece(
-    val xRatio: Float,         // 中心点 x(相对 body frame)
-    val yRatio: Float,         // 顶边 y(相对 body frame)
-    val widthRatio: Float,
-    val heightRatio: Float,
-    val color: Color,
-    val cornerRadius: Dp = 18.dp
-)
-
-private fun getClothingForSide(side: String): List<ClothingPiece> {
-    val tShirtColor = Color(0xFF64748B)   // 蓝灰
-    val shortsColor = Color(0xFF1F2937)   // 深色
-
-    return when (side) {
-        "Front", "Back" -> listOf(
-            // T-shirt: 肩膀下方 → 腰部
-            ClothingPiece(
-                xRatio = 0.50f,
-                yRatio = 0.18f,
-                widthRatio = 0.50f,
-                heightRatio = 0.30f,
-                color = tShirtColor,
-                cornerRadius = 22.dp
-            ),
-            // 短裤: 腰部 → 大腿中段
-            ClothingPiece(
-                xRatio = 0.50f,
-                yRatio = 0.48f,
-                widthRatio = 0.42f,
-                heightRatio = 0.17f,
-                color = shortsColor,
-                cornerRadius = 14.dp
-            )
-        )
-
-        "Left", "Right" -> {
-            // 侧视图身体更窄,衣服跟着收窄并轻微偏移
-            val centerX = if (side == "Left") 0.55f else 0.45f
-            listOf(
-                ClothingPiece(
-                    xRatio = centerX,
-                    yRatio = 0.30f,
-                    widthRatio = 0.18f,
-                    heightRatio = 0.28f,
-                    color = tShirtColor,
-                    cornerRadius = 18.dp
-                ),
-                ClothingPiece(
-                    xRatio = centerX,
-                    yRatio = 0.58f,
-                    widthRatio = 0.16f,
-                    heightRatio = 0.17f,
-                    color = shortsColor,
-                    cornerRadius = 12.dp
-                )
-            )
-        }
-
-        else -> emptyList()
-    }
-}
 
 data class ParsedGeminiResponse(
     val urgency: String,
@@ -580,8 +523,11 @@ private fun ClothingOverlay(
     overlaySpec: BodyOverlaySpec,
     side: String
 ) {
-    val density = LocalDensity.current
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
+
+    val tShirtColor = Color(0xFF64748B)      // 蓝灰
+    val briefsColor = Color(0xFF1F2937)      // 深色裤衩
+    val waistbandColor = Color(0xFF374151)   // 裤腰高光(略亮一点)
 
     Box(
         modifier = Modifier
@@ -590,29 +536,155 @@ private fun ClothingOverlay(
     ) {
         if (canvasSize.width == 0 || canvasSize.height == 0) return@Box
 
-        val bodyFrameLeft = canvasSize.width * overlaySpec.bounds.leftRatio
-        val bodyFrameTop = canvasSize.height * overlaySpec.bounds.topRatio
-        val bodyFrameWidth = canvasSize.width * overlaySpec.bounds.widthRatio
-        val bodyFrameHeight = canvasSize.height * overlaySpec.bounds.heightRatio
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val bfL = canvasSize.width * overlaySpec.bounds.leftRatio
+            val bfT = canvasSize.height * overlaySpec.bounds.topRatio
+            val bfW = canvasSize.width * overlaySpec.bounds.widthRatio
+            val bfH = canvasSize.height * overlaySpec.bounds.heightRatio
 
-        getClothingForSide(side).forEach { piece ->
-            val widthPx = bodyFrameWidth * piece.widthRatio
-            val heightPx = bodyFrameHeight * piece.heightRatio
-            val xPx = bodyFrameLeft + (bodyFrameWidth * piece.xRatio) - (widthPx / 2f)
-            val yPx = bodyFrameTop + (bodyFrameHeight * piece.yRatio)
-
-            Box(
-                modifier = Modifier
-                    .offset { IntOffset(xPx.roundToInt(), yPx.roundToInt()) }
-                    .size(
-                        width = with(density) { widthPx.toDp() },
-                        height = with(density) { heightPx.toDp() }
+            when (side) {
+                "Front", "Back" -> {
+                    drawTShirt(
+                        color = tShirtColor,
+                        centerX = bfL + bfW * 0.50f,
+                        topY = bfT + bfH * 0.18f,
+                        width = bfW * 0.34f,
+                        height = bfH * 0.32f
                     )
-                    .clip(RoundedCornerShape(piece.cornerRadius))
-                    .background(piece.color.copy(alpha = 0.88f))
-            )
+                    drawBriefs(
+                        bodyColor = briefsColor,
+                        waistColor = waistbandColor,
+                        centerX = bfL + bfW * 0.50f,
+                        topY = bfT + bfH * 0.50f,
+                        width = bfW * 0.36f,
+                        height = bfH * 0.18f
+                    )
+                }
+
+                "Left", "Right" -> {
+                    val cx = if (side == "Left") 0.55f else 0.45f
+                    drawTShirt(
+                        color = tShirtColor,
+                        centerX = bfL + bfW * cx,
+                        topY = bfT + bfH * 0.20f,
+                        width = bfW * 0.18f,
+                        height = bfH * 0.32f
+                    )
+                    drawBriefsSide(
+                        bodyColor = briefsColor,
+                        waistColor = waistbandColor,
+                        centerX = bfL + bfW * cx,
+                        topY = bfT + bfH * 0.50f,
+                        width = bfW * 0.18f,
+                        height = bfH * 0.18f
+                    )
+                }
+            }
         }
     }
+}
+
+private fun DrawScope.drawTShirt(
+    color: Color,
+    centerX: Float,
+    topY: Float,
+    width: Float,
+    height: Float
+) {
+    val x = centerX - width / 2f
+    drawRoundRect(
+        color = color,
+        topLeft = Offset(x, topY),
+        size = Size(width, height),
+        cornerRadius = CornerRadius(width * 0.12f, width * 0.12f)
+    )
+    // 领口暗影(在颈部位置加一小块更深的色,衣服更立体)
+    val neckW = width * 0.22f
+    val neckH = height * 0.08f
+    drawRoundRect(
+        color = color.copy(red = color.red * 0.7f, green = color.green * 0.7f, blue = color.blue * 0.7f),
+        topLeft = Offset(centerX - neckW / 2f, topY),
+        size = Size(neckW, neckH),
+        cornerRadius = CornerRadius(neckW * 0.4f, neckW * 0.4f)
+    )
+}
+
+// 正/背面裤衩:有胯下 V 字口 + 两侧大腿弧形开口
+private fun DrawScope.drawBriefs(
+    bodyColor: Color,
+    waistColor: Color,
+    centerX: Float,
+    topY: Float,
+    width: Float,
+    height: Float
+) {
+    val x = centerX - width / 2f
+    val y = topY
+    val w = width
+    val h = height
+    val cr = w * 0.10f                    // 顶部圆角
+
+    val path = Path().apply {
+        // 顶边(裤腰)从左上圆角开始
+        moveTo(x + cr, y)
+        lineTo(x + w - cr, y)
+        // 右上圆角
+        quadraticBezierTo(x + w, y, x + w, y + cr)
+        // 右侧直边下到大腿口
+        lineTo(x + w, y + h * 0.42f)
+        // 右大腿弧形开口(向内弯)
+        cubicTo(
+            x + w * 0.95f, y + h * 0.78f,
+            x + w * 0.78f, y + h * 1.00f,
+            x + w * 0.60f, y + h * 1.00f
+        )
+        // 上行到胯下 V 字尖
+        lineTo(x + w * 0.50f, y + h * 0.62f)
+        // 下行到左大腿口
+        lineTo(x + w * 0.40f, y + h * 1.00f)
+        // 左大腿弧形开口(向内弯)
+        cubicTo(
+            x + w * 0.22f, y + h * 1.00f,
+            x + w * 0.05f, y + h * 0.78f,
+            x, y + h * 0.42f
+        )
+        // 左侧直边上到左上圆角
+        lineTo(x, y + cr)
+        quadraticBezierTo(x, y, x + cr, y)
+        close()
+    }
+    drawPath(path, bodyColor)
+
+    // 裤腰高光带
+    drawRect(
+        color = waistColor,
+        topLeft = Offset(x, y),
+        size = Size(w, h * 0.14f)
+    )
+}
+
+// 侧视图裤衩:简化为带圆角的"L"形(只看到一条腿轮廓)
+private fun DrawScope.drawBriefsSide(
+    bodyColor: Color,
+    waistColor: Color,
+    centerX: Float,
+    topY: Float,
+    width: Float,
+    height: Float
+) {
+    val x = centerX - width / 2f
+    val cr = width * 0.18f
+    drawRoundRect(
+        color = bodyColor,
+        topLeft = Offset(x, topY),
+        size = Size(width, height),
+        cornerRadius = CornerRadius(cr, cr)
+    )
+    drawRect(
+        color = waistColor,
+        topLeft = Offset(x, topY),
+        size = Size(width, height * 0.16f)
+    )
 }
 
 @Composable
