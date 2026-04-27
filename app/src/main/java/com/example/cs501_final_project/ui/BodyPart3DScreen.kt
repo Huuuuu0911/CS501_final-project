@@ -982,7 +982,7 @@ private fun ClothingOverlay(
                         waistColor = waistBand,
                         seamColor = seamColor,
                         centerX = bfL + bfW * 0.50f,
-                        topY = bfT + bfH * 0.425f,
+                        topY = bfT + bfH * 0.385f,
                         width = bfW * 0.34f,
                         height = bfH * 0.205f
                     )
@@ -996,7 +996,7 @@ private fun ClothingOverlay(
                         panelColor = darkPanel,
                         waistColor = waistBand,
                         centerX = bfL + bfW * sideCenter,
-                        topY = bfT + bfH * 0.425f,
+                        topY = bfT + bfH * 0.385f,
                         width = bfW * 0.17f,
                         height = bfH * 0.205f
                     )
