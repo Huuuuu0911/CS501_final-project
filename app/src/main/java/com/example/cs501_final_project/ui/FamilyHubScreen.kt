@@ -382,7 +382,7 @@ private fun FamilyHubContent(
                                 viewModel.addQuickRecord(
                                     member = member,
                                     symptoms = symptoms,
-                                    painLevel = painLevel.toInt()
+                                    pain = painLevel.toInt()
                                 )
                                 symptoms = ""
                                 painLevel = 3f

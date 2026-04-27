@@ -11,6 +11,7 @@ import com.example.cs501_final_project.data.remote.CloudHealthRecord
 import com.example.cs501_final_project.data.remote.CloudJoinRequest
 import com.example.cs501_final_project.data.remote.RemoteFamilyRepository
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
 class FamilyHubViewModel : ViewModel() {
@@ -51,12 +52,30 @@ class FamilyHubViewModel : ViewModel() {
         if (familyJob != null) return
 
         familyJob = viewModelScope.launch {
-            repo.listenMyFamilies().collect { list ->
-                families = list
-
-                if (selectedFamily == null && list.isNotEmpty()) {
-                    selectFamily(list.first())
+            repo.listenMyFamilies()
+                .catch { e ->
+                    message = e.message ?: "Could not load families."
                 }
+                .collect { list ->
+                    families = list
+
+                    if (selectedFamily == null && list.isNotEmpty()) {
+                        selectFamily(list.first())
+                    }
+                }
+        }
+    }
+
+    fun signIn(email: String, password: String) {
+        viewModelScope.launch {
+            try {
+                repo.signIn(email, password)
+                isSignedIn = true
+                userEmail = repo.currentUserEmail()
+                message = "Signed in."
+                start()
+            } catch (e: Exception) {
+                message = e.message ?: "Sign in failed."
             }
         }
     }
@@ -75,30 +94,8 @@ class FamilyHubViewModel : ViewModel() {
         }
     }
 
-    fun signIn(email: String, password: String) {
-        viewModelScope.launch {
-            try {
-                repo.signIn(email, password)
-                isSignedIn = true
-                userEmail = repo.currentUserEmail()
-                message = "Signed in."
-                start()
-            } catch (e: Exception) {
-                message = e.message ?: "Sign in failed."
-            }
-        }
-    }
-
     fun signOut() {
         repo.signOut()
-        isSignedIn = false
-        userEmail = ""
-        message = "Signed out."
-        families = emptyList()
-        selectedFamily = null
-        members = emptyList()
-        records = emptyList()
-        joinRequests = emptyList()
 
         familyJob?.cancel()
         memberJob?.cancel()
@@ -109,20 +106,24 @@ class FamilyHubViewModel : ViewModel() {
         memberJob = null
         recordJob = null
         joinRequestJob = null
+
+        isSignedIn = false
+        userEmail = ""
+        message = "Signed out."
+        families = emptyList()
+        selectedFamily = null
+        members = emptyList()
+        records = emptyList()
+        joinRequests = emptyList()
     }
 
-    fun createFamily(familyName: String) {
-        if (familyName.isBlank()) {
-            message = "Family name is required."
-            return
-        }
-
+    fun createFamily(name: String) {
         viewModelScope.launch {
             try {
-                repo.createFamily(familyName)
-                message = "Family created."
+                val familyId = repo.createFamily(name)
+                message = "Family created: $familyId"
             } catch (e: Exception) {
-                message = e.message ?: "Could not create family."
+                message = e.message ?: "Create family failed."
             }
         }
     }
@@ -135,59 +136,67 @@ class FamilyHubViewModel : ViewModel() {
         joinRequestJob?.cancel()
 
         memberJob = viewModelScope.launch {
-            repo.listenFamilyMembers(family.id).collect {
-                members = it
-            }
+            repo.listenFamilyMembers(family.id)
+                .catch { e ->
+                    message = e.message ?: "Could not load members."
+                }
+                .collect {
+                    members = it
+                }
         }
 
         recordJob = viewModelScope.launch {
-            repo.listenHealthRecords(family.id).collect {
-                records = it
-            }
+            repo.listenHealthRecords(family.id)
+                .catch { e ->
+                    message = e.message ?: "Could not load records."
+                }
+                .collect {
+                    records = it
+                }
         }
 
         joinRequestJob = viewModelScope.launch {
-            repo.listenJoinRequests(family.id).collect {
-                joinRequests = it
-            }
+            repo.listenJoinRequests(family.id)
+                .catch { e ->
+                    message = e.message ?: "Could not load join requests."
+                }
+                .collect {
+                    joinRequests = it
+                }
         }
     }
 
-    fun addMember(name: String, relationship: String, birthday: String) {
+    fun addMember(name: String, relation: String, birthday: String) {
         val family = selectedFamily ?: return
-
-        if (name.isBlank()) {
-            message = "Member name is required."
-            return
-        }
 
         viewModelScope.launch {
             try {
-                repo.addFamilyMember(
-                    familyId = family.id,
-                    name = name,
-                    relationship = relationship,
-                    birthday = birthday
-                )
-                message = "Family member added."
+                repo.addFamilyMember(family.id, name, relation, birthday)
+                message = "Member added."
             } catch (e: Exception) {
-                message = e.message ?: "Could not add member."
+                message = e.message ?: "Add member failed."
             }
         }
     }
 
-    fun addQuickRecord(member: CloudFamilyMember, symptoms: String, painLevel: Int) {
+    fun requestToJoinFamily(familyId: String) {
+        viewModelScope.launch {
+            try {
+                repo.requestToJoinFamily(familyId)
+                message = "Join request sent."
+            } catch (e: Exception) {
+                message = e.message ?: "Join failed."
+            }
+        }
+    }
+
+    fun addQuickRecord(member: CloudFamilyMember, symptoms: String, pain: Int) {
         val family = selectedFamily ?: return
 
-        if (symptoms.isBlank()) {
-            message = "Symptoms are required."
-            return
-        }
-
         val urgency = when {
-            painLevel >= 8 -> "Emergency"
-            painLevel >= 5 -> "Urgent Care"
-            else -> "Primary Care"
+            pain >= 8 -> "Emergency"
+            pain >= 5 -> "Urgent"
+            else -> "Normal"
         }
 
         viewModelScope.launch {
@@ -196,32 +205,17 @@ class FamilyHubViewModel : ViewModel() {
                     familyId = family.id,
                     memberId = member.id,
                     type = "symptom",
-                    title = "Symptom Check",
+                    title = "Quick Record",
                     symptoms = symptoms,
                     bodyArea = "",
-                    painLevel = painLevel,
+                    painLevel = pain,
                     urgency = urgency,
-                    notes = "Added from Family Hub."
+                    notes = ""
                 )
-                message = "Health record added."
-            } catch (e: Exception) {
-                message = e.message ?: "Could not add record."
-            }
-        }
-    }
 
-    fun requestToJoinFamily(familyId: String) {
-        if (familyId.isBlank()) {
-            message = "Family ID is required."
-            return
-        }
-
-        viewModelScope.launch {
-            try {
-                repo.requestToJoinFamily(familyId)
-                message = "Join request sent."
+                message = "Record saved."
             } catch (e: Exception) {
-                message = e.message ?: "Could not send join request."
+                message = e.message ?: "Save record failed."
             }
         }
     }
@@ -231,14 +225,10 @@ class FamilyHubViewModel : ViewModel() {
 
         viewModelScope.launch {
             try {
-                repo.approveJoinRequest(
-                    familyId = family.id,
-                    request = request,
-                    role = "editor"
-                )
+                repo.approveJoinRequest(family.id, request)
                 message = "Request approved."
             } catch (e: Exception) {
-                message = e.message ?: "Could not approve request."
+                message = e.message ?: "Approve failed."
             }
         }
     }
@@ -251,7 +241,7 @@ class FamilyHubViewModel : ViewModel() {
                 repo.rejectJoinRequest(family.id, request)
                 message = "Request rejected."
             } catch (e: Exception) {
-                message = e.message ?: "Could not reject request."
+                message = e.message ?: "Reject failed."
             }
         }
     }

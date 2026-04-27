@@ -4,7 +4,13 @@ data class CloudUser(
     val uid: String = "",
     val email: String = "",
     val name: String = "",
-    val createdAt: Long = 0L
+    val birthday: String = "",
+    val phone: String = "",
+    val selectedFamilyId: String = "",
+    val familyIds: List<String> = emptyList(),
+    val createdAt: Long = 0L,
+    val lastLoginAt: Long = 0L,
+    val updatedAt: Long = 0L
 )
 
 data class CloudFamily(

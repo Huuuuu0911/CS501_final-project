@@ -1,29 +1,165 @@
 package com.example.cs501_final_project.data
 
-import android.app.Application
-import android.util.Patterns
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.AndroidViewModel
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
-import java.security.MessageDigest
-import java.util.UUID
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.cs501_final_project.data.remote.CloudUser
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.UserProfileChangeRequest
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
-class AuthViewModel(application: Application) : AndroidViewModel(application) {
+data class AuthSession(
+    val userId: String,
+    val displayName: String,
+    val email: String = "",
+    val identifier: String = email,
+    val isEmergencyMode: Boolean = false,
+    val signedInAt: Long = System.currentTimeMillis()
+)
 
-    private val prefs = application.getSharedPreferences("care_route_auth", Application.MODE_PRIVATE)
-    private val gson = Gson()
+class AuthViewModel : ViewModel() {
 
-    var session by mutableStateOf<AuthSession?>(loadSession())
+    private val auth = FirebaseAuth.getInstance()
+    private val db = FirebaseFirestore.getInstance()
+
+    var session by mutableStateOf<AuthSession?>(null)
         private set
 
-    var isBusy by mutableStateOf(false)
+    var message by mutableStateOf("")
         private set
 
-    var errorMessage by mutableStateOf<String?>(null)
+    val errorMessage: String
+        get() = message
+
+    var isLoading by mutableStateOf(false)
         private set
+
+    val isBusy: Boolean
+        get() = isLoading
+
+    init {
+        loadCurrentUser()
+    }
+
+    private fun now(): Long {
+        return System.currentTimeMillis()
+    }
+
+    private fun loadCurrentUser() {
+        val user = auth.currentUser
+
+        if (user == null) {
+            session = null
+            return
+        }
+
+        session = AuthSession(
+            userId = user.uid,
+            displayName = user.displayName ?: user.email ?: "User",
+            email = user.email ?: "",
+            identifier = user.email ?: "",
+            isEmergencyMode = false,
+            signedInAt = now()
+        )
+
+        viewModelScope.launch {
+            ensureUserDocument()
+        }
+    }
+
+    private suspend fun ensureUserDocument() {
+        val user = auth.currentUser ?: return
+
+        val userRef = db.collection("users").document(user.uid)
+        val snapshot = userRef.get().await()
+
+        val name = user.displayName ?: user.email ?: "User"
+        val email = user.email ?: ""
+
+        if (!snapshot.exists()) {
+            val cloudUser = CloudUser(
+                uid = user.uid,
+                email = email,
+                name = name,
+                createdAt = now(),
+                lastLoginAt = now(),
+                updatedAt = now()
+            )
+
+            userRef.set(cloudUser).await()
+        } else {
+            val update = mapOf(
+                "uid" to user.uid,
+                "email" to email,
+                "name" to name,
+                "lastLoginAt" to now(),
+                "updatedAt" to now()
+            )
+
+            userRef.set(update, SetOptions.merge()).await()
+        }
+    }
+
+    fun login(
+        email: String,
+        password: String
+    ) {
+        if (email.isBlank() || password.isBlank()) {
+            message = "Please enter email and password."
+            return
+        }
+
+        viewModelScope.launch {
+            isLoading = true
+            message = ""
+
+            try {
+                val result = auth.signInWithEmailAndPassword(
+                    email.trim(),
+                    password
+                ).await()
+
+                val user = result.user
+
+                if (user != null) {
+                    ensureUserDocument()
+
+                    session = AuthSession(
+                        userId = user.uid,
+                        displayName = user.displayName ?: user.email ?: "User",
+                        email = user.email ?: "",
+                        identifier = user.email ?: "",
+                        isEmergencyMode = false,
+                        signedInAt = now()
+                    )
+
+                    message = "Signed in."
+                }
+            } catch (e: Exception) {
+                message = e.message ?: "Login failed."
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    fun register(
+        name: String,
+        email: String,
+        password: String
+    ) {
+        register(
+            displayName = name,
+            identifier = email,
+            password = password,
+            confirmPassword = password
+        )
+    }
 
     fun register(
         displayName: String,
@@ -31,159 +167,177 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         password: String,
         confirmPassword: String
     ) {
-        val safeName = displayName.trim()
-        val safeIdentifier = identifier.trim().lowercase()
-
-        when {
-            safeName.isBlank() -> {
-                errorMessage = "Please enter your name."
-                return
-            }
-            !isValidIdentifier(safeIdentifier) -> {
-                errorMessage = "Please enter a valid email or phone number."
-                return
-            }
-            password.length < 6 -> {
-                errorMessage = "Password must be at least 6 characters."
-                return
-            }
-            password != confirmPassword -> {
-                errorMessage = "Passwords do not match."
-                return
-            }
-        }
-
-        isBusy = true
-        val users = loadUsers().toMutableList()
-        val exists = users.any { it.identifier == safeIdentifier }
-
-        if (exists) {
-            isBusy = false
-            errorMessage = "This email or phone is already registered."
+        if (displayName.isBlank() || identifier.isBlank() || password.isBlank()) {
+            message = "Please fill in all fields."
             return
         }
 
-        val newUser = StoredUser(
-            id = UUID.randomUUID().toString(),
-            displayName = safeName,
-            identifier = safeIdentifier,
-            passwordHash = sha256(password),
-            createdAt = System.currentTimeMillis()
-        )
+        if (password != confirmPassword) {
+            message = "Passwords do not match."
+            return
+        }
 
-        users.add(newUser)
-        saveUsers(users)
+        viewModelScope.launch {
+            isLoading = true
+            message = ""
 
-        session = AuthSession(
-            userId = newUser.id,
-            displayName = newUser.displayName,
-            identifier = newUser.identifier,
-            isEmergencyMode = false,
-            signedInAt = System.currentTimeMillis()
-        )
-        saveSession(session)
-        isBusy = false
-        errorMessage = null
+            try {
+                val result = auth.createUserWithEmailAndPassword(
+                    identifier.trim(),
+                    password
+                ).await()
+
+                val user = result.user
+
+                if (user != null) {
+                    val profileUpdate = UserProfileChangeRequest.Builder()
+                        .setDisplayName(displayName.trim())
+                        .build()
+
+                    user.updateProfile(profileUpdate).await()
+
+                    val cloudUser = CloudUser(
+                        uid = user.uid,
+                        email = identifier.trim(),
+                        name = displayName.trim(),
+                        createdAt = now(),
+                        lastLoginAt = now(),
+                        updatedAt = now()
+                    )
+
+                    db.collection("users")
+                        .document(user.uid)
+                        .set(cloudUser)
+                        .await()
+
+                    session = AuthSession(
+                        userId = user.uid,
+                        displayName = displayName.trim(),
+                        email = identifier.trim(),
+                        identifier = identifier.trim(),
+                        isEmergencyMode = false,
+                        signedInAt = now()
+                    )
+
+                    message = "Account created."
+                }
+            } catch (e: Exception) {
+                message = e.message ?: "Register failed."
+            } finally {
+                isLoading = false
+            }
+        }
     }
 
-    fun login(identifier: String, password: String) {
-        val safeIdentifier = identifier.trim().lowercase()
-
-        when {
-            !isValidIdentifier(safeIdentifier) -> {
-                errorMessage = "Please enter a valid email or phone number."
-                return
-            }
-            password.isBlank() -> {
-                errorMessage = "Please enter your password."
-                return
-            }
-        }
-
-        isBusy = true
-        val hashedPassword = sha256(password)
-        val user = loadUsers().firstOrNull {
-            it.identifier == safeIdentifier && it.passwordHash == hashedPassword
-        }
+    fun updateCloudProfile(
+        name: String,
+        birthday: String = "",
+        phone: String = ""
+    ) {
+        val user = auth.currentUser
 
         if (user == null) {
-            isBusy = false
-            errorMessage = "Wrong account or password."
+            message = "Please sign in first."
             return
         }
 
-        session = AuthSession(
-            userId = user.id,
-            displayName = user.displayName,
-            identifier = user.identifier,
-            isEmergencyMode = false,
-            signedInAt = System.currentTimeMillis()
-        )
-        saveSession(session)
-        isBusy = false
-        errorMessage = null
-    }
+        viewModelScope.launch {
+            isLoading = true
+            message = ""
 
-    fun enterEmergencyMode() {
-        session = AuthSession(
-            userId = "emergency_guest",
-            displayName = "Emergency Guest",
-            identifier = "guest",
-            isEmergencyMode = true,
-            signedInAt = System.currentTimeMillis()
-        )
-        saveSession(session)
-        errorMessage = null
+            try {
+                val cleanName = name.trim().ifBlank {
+                    user.displayName ?: user.email ?: "User"
+                }
+
+                val profileUpdate = UserProfileChangeRequest.Builder()
+                    .setDisplayName(cleanName)
+                    .build()
+
+                user.updateProfile(profileUpdate).await()
+
+                val update = mapOf(
+                    "uid" to user.uid,
+                    "email" to (user.email ?: ""),
+                    "name" to cleanName,
+                    "birthday" to birthday.trim(),
+                    "phone" to phone.trim(),
+                    "updatedAt" to now()
+                )
+
+                db.collection("users")
+                    .document(user.uid)
+                    .set(update, SetOptions.merge())
+                    .await()
+
+                session = session?.copy(
+                    displayName = cleanName
+                )
+
+                message = "Profile saved."
+            } catch (e: Exception) {
+                message = e.message ?: "Could not save profile."
+            } finally {
+                isLoading = false
+            }
+        }
     }
 
     fun logout() {
+        auth.signOut()
         session = null
-        prefs.edit().remove(KEY_SESSION).apply()
-        errorMessage = null
+        message = "Signed out."
+    }
+
+    fun continueAsGuest() {
+        session = AuthSession(
+            userId = "guest_${now()}",
+            displayName = "Emergency Guest",
+            email = "",
+            identifier = "guest",
+            isEmergencyMode = true,
+            signedInAt = now()
+        )
+
+        message = "Emergency mode enabled."
+    }
+
+    fun enterEmergencyMode() {
+        continueAsGuest()
+    }
+
+    fun continueAsEmergencyGuest() {
+        continueAsGuest()
+    }
+
+    fun signIn(
+        email: String,
+        password: String
+    ) {
+        login(email, password)
+    }
+
+    fun signUp(
+        name: String,
+        email: String,
+        password: String
+    ) {
+        register(name, email, password)
+    }
+
+    fun createAccount(
+        name: String,
+        email: String,
+        password: String
+    ) {
+        register(name, email, password)
+    }
+
+    fun clearMessage() {
+        message = ""
     }
 
     fun clearError() {
-        errorMessage = null
-    }
-
-    private fun isValidIdentifier(value: String): Boolean {
-        if (value.isBlank()) return false
-        val looksLikeEmail = Patterns.EMAIL_ADDRESS.matcher(value).matches()
-        val digitCount = value.filter { it.isDigit() }.length
-        val looksLikePhone = digitCount >= 8
-        return looksLikeEmail || looksLikePhone
-    }
-
-    private fun sha256(text: String): String {
-        val bytes = MessageDigest.getInstance("SHA-256").digest(text.toByteArray())
-        return bytes.joinToString(separator = "") { "%02x".format(it) }
-    }
-
-    private fun loadUsers(): List<StoredUser> {
-        val json = prefs.getString(KEY_USERS, null) ?: return emptyList()
-        val type = object : TypeToken<List<StoredUser>>() {}.type
-        return runCatching { gson.fromJson<List<StoredUser>>(json, type) }.getOrDefault(emptyList())
-    }
-
-    private fun saveUsers(users: List<StoredUser>) {
-        prefs.edit().putString(KEY_USERS, gson.toJson(users)).apply()
-    }
-
-    private fun loadSession(): AuthSession? {
-        val json = prefs.getString(KEY_SESSION, null) ?: return null
-        return runCatching { gson.fromJson(json, AuthSession::class.java) }.getOrNull()
-    }
-
-    private fun saveSession(session: AuthSession?) {
-        if (session == null) {
-            prefs.edit().remove(KEY_SESSION).apply()
-        } else {
-            prefs.edit().putString(KEY_SESSION, gson.toJson(session)).apply()
-        }
-    }
-
-    private companion object {
-        const val KEY_USERS = "registered_users"
-        const val KEY_SESSION = "active_session"
+        clearMessage()
     }
 }

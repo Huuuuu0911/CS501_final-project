@@ -7,11 +7,3 @@ data class StoredUser(
     val passwordHash: String,
     val createdAt: Long
 )
-
-data class AuthSession(
-    val userId: String,
-    val displayName: String,
-    val identifier: String,
-    val isEmergencyMode: Boolean,
-    val signedInAt: Long
-)
