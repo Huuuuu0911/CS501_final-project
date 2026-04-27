@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +46,7 @@ import com.example.cs501_final_project.data.CareRouteViewModel
 import com.example.cs501_final_project.ui.AuthScreen
 import com.example.cs501_final_project.ui.BodyPart3DScreen
 import com.example.cs501_final_project.ui.DetailScreen
+import com.example.cs501_final_project.ui.FamilyHubScreen
 import com.example.cs501_final_project.ui.FollowUpScreen
 import com.example.cs501_final_project.ui.HistoryScreen
 import com.example.cs501_final_project.ui.HomeScreen
@@ -57,10 +59,40 @@ private sealed class BottomNavDestination(
     val icon: ImageVector,
     val activeColor: Color
 ) {
-    data object Home : BottomNavDestination("home", "Home", Icons.Default.Home, Color(0xFF4F8EEB))
-    data object History : BottomNavDestination("history", "History", Icons.Default.History, Color(0xFF7B61FF))
-    data object Map : BottomNavDestination("map", "Map", Icons.Default.Map, Color(0xFF12B76A))
-    data object Setting : BottomNavDestination("setting", "Setting", Icons.Default.Settings, Color(0xFFF79009))
+    data object Home : BottomNavDestination(
+        route = "home",
+        label = "Home",
+        icon = Icons.Default.Home,
+        activeColor = Color(0xFF4F8EEB)
+    )
+
+    data object Family : BottomNavDestination(
+        route = "family_hub",
+        label = "Family",
+        icon = Icons.Default.Person,
+        activeColor = Color(0xFF9B51E0)
+    )
+
+    data object History : BottomNavDestination(
+        route = "history",
+        label = "History",
+        icon = Icons.Default.History,
+        activeColor = Color(0xFF7B61FF)
+    )
+
+    data object Map : BottomNavDestination(
+        route = "map",
+        label = "Map",
+        icon = Icons.Default.Map,
+        activeColor = Color(0xFF12B76A)
+    )
+
+    data object Setting : BottomNavDestination(
+        route = "setting",
+        label = "Setting",
+        icon = Icons.Default.Settings,
+        activeColor = Color(0xFFF79009)
+    )
 }
 
 @Composable
@@ -93,17 +125,27 @@ private fun MainAppNav(
 
     LaunchedEffect(session.userId, session.displayName, session.isEmergencyMode) {
         val currentName = viewModel.selfProfile.name.trim()
+
         if (session.isEmergencyMode) {
             if (currentName.isBlank() || currentName == "You") {
-                viewModel.updateSelfProfile(viewModel.selfProfile.copy(name = "Emergency Guest"))
+                viewModel.updateSelfProfile(
+                    viewModel.selfProfile.copy(name = "Emergency Guest")
+                )
             }
-        } else if (currentName.isBlank() || currentName == "You" || currentName == "Emergency Guest") {
-            viewModel.updateSelfProfile(viewModel.selfProfile.copy(name = session.displayName))
+        } else if (
+            currentName.isBlank() ||
+            currentName == "You" ||
+            currentName == "Emergency Guest"
+        ) {
+            viewModel.updateSelfProfile(
+                viewModel.selfProfile.copy(name = session.displayName)
+            )
         }
     }
 
     val topLevelRoutes = setOf(
         BottomNavDestination.Home.route,
+        BottomNavDestination.Family.route,
         BottomNavDestination.History.route,
         BottomNavDestination.Map.route,
         BottomNavDestination.Setting.route,
@@ -126,6 +168,7 @@ private fun MainAppNav(
                             popUpTo(navController.graph.findStartDestination().id) {
                                 saveState = true
                             }
+
                             launchSingleTop = true
                             restoreState = true
                         }
@@ -134,19 +177,33 @@ private fun MainAppNav(
             }
         }
     ) { innerPadding ->
+
         NavHost(
             navController = navController,
             startDestination = BottomNavDestination.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
+
             composable(BottomNavDestination.Home.route) {
                 HomeScreen(
                     viewModel = viewModel,
-                    onStartClick = { navController.navigate("body3d") },
-                    onHistoryClick = { navController.navigate(BottomNavDestination.History.route) },
-                    onMapClick = { navController.navigate(BottomNavDestination.Map.route) },
-                    onSettingClick = { navController.navigate(BottomNavDestination.Setting.route) }
+                    onStartClick = {
+                        navController.navigate("body3d")
+                    },
+                    onHistoryClick = {
+                        navController.navigate(BottomNavDestination.History.route)
+                    },
+                    onMapClick = {
+                        navController.navigate(BottomNavDestination.Map.route)
+                    },
+                    onSettingClick = {
+                        navController.navigate(BottomNavDestination.Setting.route)
+                    }
                 )
+            }
+
+            composable(BottomNavDestination.Family.route) {
+                FamilyHubScreen()
             }
 
             composable(BottomNavDestination.History.route) {
@@ -172,14 +229,19 @@ private fun MainAppNav(
                     }
                 )
             ) { backStackEntry ->
-                val query = Uri.decode(backStackEntry.arguments?.getString("query").orEmpty())
+                val query = Uri.decode(
+                    backStackEntry.arguments?.getString("query").orEmpty()
+                )
+
                 MapScreen(initialQuery = query)
             }
 
             composable(BottomNavDestination.Setting.route) {
                 SettingScreen(
                     viewModel = viewModel,
-                    onLogout = { authViewModel.logout() }
+                    onLogout = {
+                        authViewModel.logout()
+                    }
                 )
             }
 
@@ -190,11 +252,15 @@ private fun MainAppNav(
             composable(
                 route = "detail/{part}",
                 arguments = listOf(
-                    navArgument("part") { type = NavType.StringType }
+                    navArgument("part") {
+                        type = NavType.StringType
+                    }
                 )
             ) { backStackEntry ->
                 DetailScreen(
-                    part = Uri.decode(backStackEntry.arguments?.getString("part").orEmpty()),
+                    part = Uri.decode(
+                        backStackEntry.arguments?.getString("part").orEmpty()
+                    ),
                     navController = navController
                 )
             }
@@ -202,15 +268,27 @@ private fun MainAppNav(
             composable(
                 route = "follow_up/{part}/{symptomText}/{painLevel}",
                 arguments = listOf(
-                    navArgument("part") { type = NavType.StringType },
-                    navArgument("symptomText") { type = NavType.StringType },
-                    navArgument("painLevel") { type = NavType.StringType }
+                    navArgument("part") {
+                        type = NavType.StringType
+                    },
+                    navArgument("symptomText") {
+                        type = NavType.StringType
+                    },
+                    navArgument("painLevel") {
+                        type = NavType.StringType
+                    }
                 )
             ) { backStackEntry ->
                 FollowUpScreen(
-                    part = Uri.decode(backStackEntry.arguments?.getString("part").orEmpty()),
-                    symptomText = Uri.decode(backStackEntry.arguments?.getString("symptomText").orEmpty()),
-                    painLevel = backStackEntry.arguments?.getString("painLevel")?.toIntOrNull() ?: 0,
+                    part = Uri.decode(
+                        backStackEntry.arguments?.getString("part").orEmpty()
+                    ),
+                    symptomText = Uri.decode(
+                        backStackEntry.arguments?.getString("symptomText").orEmpty()
+                    ),
+                    painLevel = backStackEntry.arguments
+                        ?.getString("painLevel")
+                        ?.toIntOrNull() ?: 0,
                     navController = navController,
                     viewModel = viewModel
                 )
@@ -226,6 +304,7 @@ private fun CareRouteBottomBar(
 ) {
     val items = listOf(
         BottomNavDestination.Home,
+        BottomNavDestination.Family,
         BottomNavDestination.History,
         BottomNavDestination.Map,
         BottomNavDestination.Setting
@@ -235,7 +314,7 @@ private fun CareRouteBottomBar(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         shape = RoundedCornerShape(28.dp),
         shadowElevation = 14.dp,
         tonalElevation = 8.dp,
@@ -244,13 +323,18 @@ private fun CareRouteBottomBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                .padding(horizontal = 6.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             items.forEach { item ->
                 val selected = when (item.route) {
-                    "map" -> currentRoute == "map" || currentRoute == "map?query={query}"
-                    else -> currentRoute == item.route
+                    BottomNavDestination.Map.route -> {
+                        currentRoute == "map" || currentRoute == "map?query={query}"
+                    }
+
+                    else -> {
+                        currentRoute == item.route
+                    }
                 }
 
                 val selectedBrush = Brush.horizontalGradient(
@@ -269,29 +353,46 @@ private fun CareRouteBottomBar(
                                 selectedBrush
                             } else {
                                 Brush.horizontalGradient(
-                                    colors = listOf(Color.Transparent, Color.Transparent)
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        Color.Transparent
+                                    )
                                 )
                             }
                         )
-                        .clickable { onNavigate(item.route) }
-                        .padding(vertical = 10.dp),
+                        .clickable {
+                            onNavigate(item.route)
+                        }
+                        .padding(vertical = 9.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
                         Icon(
                             imageVector = item.icon,
                             contentDescription = item.label,
-                            tint = if (selected) item.activeColor else Color(0xFF98A2B3)
+                            tint = if (selected) {
+                                item.activeColor
+                            } else {
+                                Color(0xFF98A2B3)
+                            }
                         )
 
                         Text(
                             text = item.label,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (selected) item.activeColor else Color(0xFF667085)
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (selected) {
+                                FontWeight.Bold
+                            } else {
+                                FontWeight.Medium
+                            },
+                            color = if (selected) {
+                                item.activeColor
+                            } else {
+                                Color(0xFF667085)
+                            }
                         )
                     }
                 }
