@@ -290,11 +290,15 @@ class AuthViewModel : ViewModel() {
     }
 
     fun continueAsGuest() {
+        auth.signOut()
+
+        val emergencyId = "emergency_guest_${now()}"
+
         session = AuthSession(
-            userId = "guest_${now()}",
+            userId = emergencyId,
             displayName = "Emergency Guest",
             email = "",
-            identifier = "guest",
+            identifier = "emergency_guest",
             isEmergencyMode = true,
             signedInAt = now()
         )

@@ -124,22 +124,32 @@ private fun MainAppNav(
     val currentRoute = navBackStackEntry?.destination?.route
 
     LaunchedEffect(session.userId, session.displayName, session.isEmergencyMode) {
-        val currentName = viewModel.selfProfile.name.trim()
-
         if (session.isEmergencyMode) {
-            if (currentName.isBlank() || currentName == "You") {
+            viewModel.selectPerson("self")
+
+            viewModel.updateSelfProfile(
+                viewModel.selfProfile.copy(
+                    name = "Emergency Guest",
+                    phone = "",
+                    address = "",
+                    emergencyContact = "",
+                    allergies = "",
+                    medications = "",
+                    conditions = ""
+                )
+            )
+        } else {
+            val currentName = viewModel.selfProfile.name.trim()
+
+            if (
+                currentName.isBlank() ||
+                currentName == "You" ||
+                currentName == "Emergency Guest"
+            ) {
                 viewModel.updateSelfProfile(
-                    viewModel.selfProfile.copy(name = "Emergency Guest")
+                    viewModel.selfProfile.copy(name = session.displayName)
                 )
             }
-        } else if (
-            currentName.isBlank() ||
-            currentName == "You" ||
-            currentName == "Emergency Guest"
-        ) {
-            viewModel.updateSelfProfile(
-                viewModel.selfProfile.copy(name = session.displayName)
-            )
         }
     }
 
