@@ -22,12 +22,15 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PersonAddAlt1
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -47,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.cs501_final_project.data.AuthViewModel
@@ -60,6 +64,9 @@ fun AuthScreen(
     var identifier by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var confirmPassword by rememberSaveable { mutableStateOf("") }
+
+    var showPassword by rememberSaveable { mutableStateOf(false) }
+    var showConfirmPassword by rememberSaveable { mutableStateOf(false) }
 
     val bgColor = Color(0xFFF5F7FC)
     val heroGradient = Brush.horizontalGradient(
@@ -207,9 +214,43 @@ fun AuthScreen(
                         placeholder = { Text("At least 6 characters") },
                         shape = RoundedCornerShape(18.dp),
                         singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                        visualTransformation = if (showPassword) {
+                            VisualTransformation.None
+                        } else {
+                            PasswordVisualTransformation()
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { showPassword = !showPassword }
+                            ) {
+                                Icon(
+                                    imageVector = if (showPassword) {
+                                        Icons.Default.VisibilityOff
+                                    } else {
+                                        Icons.Default.Visibility
+                                    },
+                                    contentDescription = if (showPassword) {
+                                        "Hide password"
+                                    } else {
+                                        "Show password"
+                                    }
+                                )
+                            }
+                        }
                     )
+
+                    if (isLoginMode) {
+                        TextButton(
+                            onClick = {
+                                authViewModel.resetPassword(identifier)
+                            },
+                            enabled = !authViewModel.isBusy,
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Text("Forgot password?")
+                        }
+                    }
 
                     if (!isLoginMode) {
                         OutlinedTextField(
@@ -222,21 +263,59 @@ fun AuthScreen(
                             label = { Text("Confirm password") },
                             shape = RoundedCornerShape(18.dp),
                             singleLine = true,
-                            visualTransformation = PasswordVisualTransformation(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                            visualTransformation = if (showConfirmPassword) {
+                                VisualTransformation.None
+                            } else {
+                                PasswordVisualTransformation()
+                            },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = { showConfirmPassword = !showConfirmPassword }
+                                ) {
+                                    Icon(
+                                        imageVector = if (showConfirmPassword) {
+                                            Icons.Default.VisibilityOff
+                                        } else {
+                                            Icons.Default.Visibility
+                                        },
+                                        contentDescription = if (showConfirmPassword) {
+                                            "Hide password"
+                                        } else {
+                                            "Show password"
+                                        }
+                                    )
+                                }
+                            }
                         )
                     }
 
-                    authViewModel.errorMessage?.let { message ->
+                    authViewModel.errorMessage.takeIf { it.isNotBlank() }?.let { message ->
+                        val isSuccessMessage =
+                            message.contains("sent", ignoreCase = true) ||
+                                    message.contains("Signed in", ignoreCase = true) ||
+                                    message.contains("Account created", ignoreCase = true) ||
+                                    message.contains("Emergency mode", ignoreCase = true)
+
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF1F1)),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isSuccessMessage) {
+                                    Color(0xFFEFFAF3)
+                                } else {
+                                    Color(0xFFFFF1F1)
+                                }
+                            ),
                             shape = RoundedCornerShape(18.dp)
                         ) {
                             Text(
                                 text = message,
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                                color = Color(0xFFB42318),
+                                color = if (isSuccessMessage) {
+                                    Color(0xFF067647)
+                                } else {
+                                    Color(0xFFB42318)
+                                },
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         }

@@ -124,9 +124,9 @@ private fun MainAppNav(
     val currentRoute = navBackStackEntry?.destination?.route
 
     LaunchedEffect(session.userId, session.displayName, session.isEmergencyMode) {
-        if (session.isEmergencyMode) {
-            viewModel.selectPerson("self")
+        viewModel.selectPerson("self")
 
+        if (session.isEmergencyMode) {
             viewModel.updateSelfProfile(
                 viewModel.selfProfile.copy(
                     name = "Emergency Guest",
@@ -139,17 +139,13 @@ private fun MainAppNav(
                 )
             )
         } else {
-            val currentName = viewModel.selfProfile.name.trim()
-
-            if (
-                currentName.isBlank() ||
-                currentName == "You" ||
-                currentName == "Emergency Guest"
-            ) {
-                viewModel.updateSelfProfile(
-                    viewModel.selfProfile.copy(name = session.displayName)
+            viewModel.updateSelfProfile(
+                viewModel.selfProfile.copy(
+                    name = session.displayName.ifBlank {
+                        session.email.ifBlank { "User" }
+                    }
                 )
-            }
+            )
         }
     }
 

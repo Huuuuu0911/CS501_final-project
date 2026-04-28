@@ -229,6 +229,32 @@ class AuthViewModel : ViewModel() {
         }
     }
 
+    fun resetPassword(email: String) {
+        if (email.isBlank()) {
+            message = "Please enter your email first."
+            return
+        }
+
+        if (!email.contains("@")) {
+            message = "Password reset requires an email address."
+            return
+        }
+
+        viewModelScope.launch {
+            isLoading = true
+            message = ""
+
+            try {
+                auth.sendPasswordResetEmail(email.trim()).await()
+                message = "Password reset email sent. Please check your inbox."
+            } catch (e: Exception) {
+                message = e.message ?: "Could not send reset email."
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
     fun updateCloudProfile(
         name: String,
         birthday: String = "",
@@ -292,10 +318,8 @@ class AuthViewModel : ViewModel() {
     fun continueAsGuest() {
         auth.signOut()
 
-        val emergencyId = "emergency_guest_${now()}"
-
         session = AuthSession(
-            userId = emergencyId,
+            userId = "emergency_guest_${now()}",
             displayName = "Emergency Guest",
             email = "",
             identifier = "emergency_guest",
