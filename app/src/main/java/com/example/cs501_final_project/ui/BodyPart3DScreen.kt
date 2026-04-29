@@ -1,5 +1,5 @@
 package com.example.cs501_final_project.ui
-
+import io.github.sceneview.math.Position
 import android.content.res.Configuration
 import android.net.Uri
 import androidx.compose.animation.core.LinearEasing
@@ -155,9 +155,16 @@ fun BodyPart3DScreen(
     val useTwoPane = isLandscape && configuration.screenWidthDp >= 720
 
     var showBack by rememberSaveable { mutableStateOf(false) }
+    var selectedGender by rememberSaveable { mutableStateOf("Male") }
 
     val currentSide = if (showBack) "Back" else "Front"
     val rotationY = if (showBack) 180f else 0f
+
+    val modelPath = if (selectedGender == "Female") {
+        "models/female_model.glb"
+    } else {
+        "models/male_model.glb"
+    }
 
     val overlaySpec = remember(currentSide, useTwoPane) {
         getBodyOverlaySpec(currentSide, useTwoPane)
@@ -200,7 +207,8 @@ fun BodyPart3DScreen(
                         rotationY = rotationY,
                         overlaySpec = overlaySpec,
                         navController = navController,
-                        modelHeight = 420.dp
+                        modelHeight = 420.dp,
+                        modelPath = modelPath
                     )
                 }
 
@@ -212,8 +220,12 @@ fun BodyPart3DScreen(
                 ) {
                     ControlsCard(
                         currentSide = currentSide,
+                        selectedGender = selectedGender,
                         onRotate = {
                             showBack = !showBack
+                        },
+                        onGenderChange = { gender ->
+                            selectedGender = gender
                         }
                     )
 
@@ -243,13 +255,18 @@ fun BodyPart3DScreen(
                     rotationY = rotationY,
                     overlaySpec = overlaySpec,
                     navController = navController,
-                    modelHeight = 380.dp
+                    modelHeight = 380.dp,
+                    modelPath = modelPath
                 )
 
                 ControlsCard(
                     currentSide = currentSide,
+                    selectedGender = selectedGender,
                     onRotate = {
                         showBack = !showBack
+                    },
+                    onGenderChange = { gender ->
+                        selectedGender = gender
                     }
                 )
 
@@ -301,7 +318,8 @@ private fun ModelViewerCard(
     rotationY: Float,
     overlaySpec: BodyOverlaySpec,
     navController: NavController,
-    modelHeight: Dp
+    modelHeight: Dp,
+    modelPath: String
 ) {
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
@@ -364,7 +382,7 @@ private fun ModelViewerCard(
                     ) {
                         rememberModelInstance(
                             modelLoader = modelLoader,
-                            assetFileLocation = "models/male_model.glb"
+                            assetFileLocation = modelPath
                         )?.let { modelInstance ->
                             ModelNode(
                                 modelInstance = modelInstance,
@@ -374,7 +392,6 @@ private fun ModelViewerCard(
                         }
                     }
 
-                    // 衣服叠加层(在 3D 模型之上、热点之下,不拦截点击)
                     ClothingOverlay(
                         overlaySpec = overlaySpec,
                         side = currentSide
@@ -395,7 +412,9 @@ private fun ModelViewerCard(
 @Composable
 private fun ControlsCard(
     currentSide: String,
-    onRotate: () -> Unit
+    selectedGender: String,
+    onRotate: () -> Unit,
+    onGenderChange: (String) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -411,6 +430,37 @@ private fun ControlsCard(
                 text = "Model Controls",
                 style = MaterialTheme.typography.titleMedium
             )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                FilterChip(
+                    selected = selectedGender == "Male",
+                    onClick = { onGenderChange("Male") },
+                    label = { Text("Male") },
+                    modifier = Modifier.weight(1f),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Color(0xFFEAE6FF),
+                        selectedLabelColor = Color(0xFF4B3BC8),
+                        containerColor = Color(0xFFF6F8FC),
+                        labelColor = Color(0xFF48556A)
+                    )
+                )
+
+                FilterChip(
+                    selected = selectedGender == "Female",
+                    onClick = { onGenderChange("Female") },
+                    label = { Text("Female") },
+                    modifier = Modifier.weight(1f),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Color(0xFFEAE6FF),
+                        selectedLabelColor = Color(0xFF4B3BC8),
+                        containerColor = Color(0xFFF6F8FC),
+                        labelColor = Color(0xFF48556A)
+                    )
+                )
+            }
 
             Button(
                 onClick = onRotate,
@@ -433,8 +483,6 @@ private fun ControlsCard(
         }
     }
 }
-
-
 @Composable
 private fun VisibleAreasCard(
     hotspots: List<BodyHotspot>,
