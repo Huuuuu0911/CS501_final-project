@@ -154,16 +154,10 @@ fun BodyPart3DScreen(
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val useTwoPane = isLandscape && configuration.screenWidthDp >= 720
 
-    var rotationIndex by rememberSaveable { mutableIntStateOf(0) }
-    val rotationY = rotationIndex * 90f
+    var showBack by rememberSaveable { mutableStateOf(false) }
 
-    val currentSide = when (rotationIndex) {
-        0 -> "Front"
-        1 -> "Left"
-        2 -> "Back"
-        3 -> "Right"
-        else -> "Front"
-    }
+    val currentSide = if (showBack) "Back" else "Front"
+    val rotationY = if (showBack) 180f else 0f
 
     val overlaySpec = remember(currentSide, useTwoPane) {
         getBodyOverlaySpec(currentSide, useTwoPane)
@@ -217,11 +211,9 @@ fun BodyPart3DScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     ControlsCard(
-                        onRotateLeft = {
-                            rotationIndex = (rotationIndex - 1 + 4) % 4
-                        },
-                        onRotateRight = {
-                            rotationIndex = (rotationIndex + 1) % 4
+                        currentSide = currentSide,
+                        onRotate = {
+                            showBack = !showBack
                         }
                     )
 
@@ -255,11 +247,9 @@ fun BodyPart3DScreen(
                 )
 
                 ControlsCard(
-                    onRotateLeft = {
-                        rotationIndex = (rotationIndex - 1 + 4) % 4
-                    },
-                    onRotateRight = {
-                        rotationIndex = (rotationIndex + 1) % 4
+                    currentSide = currentSide,
+                    onRotate = {
+                        showBack = !showBack
                     }
                 )
 
@@ -404,8 +394,8 @@ private fun ModelViewerCard(
 
 @Composable
 private fun ControlsCard(
-    onRotateLeft: () -> Unit,
-    onRotateRight: () -> Unit
+    currentSide: String,
+    onRotate: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -422,36 +412,28 @@ private fun ControlsCard(
                 style = MaterialTheme.typography.titleMedium
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            Button(
+                onClick = onRotate,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF7B61FF)
+                )
             ) {
-                Button(
-                    onClick = onRotateLeft,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Text("Rotate Left")
-                }
-
-                Button(
-                    onClick = onRotateRight,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF7B61FF)
-                    )
-                ) {
-                    Text("Rotate Right")
-                }
+                Text(
+                    text = if (currentSide == "Front") {
+                        "Rotate to Back"
+                    } else {
+                        "Rotate to Front"
+                    }
+                )
             }
         }
     }
 }
+
 
 @Composable
 private fun VisibleAreasCard(
@@ -543,33 +525,17 @@ private fun ClothingOverlay(
             val bfW = canvasSize.width * overlaySpec.bounds.widthRatio
             val bfH = canvasSize.height * overlaySpec.bounds.heightRatio
 
-            when (side) {
-                "Front", "Back" -> {
-                    drawFittedBoxerBriefs(
-                        mainColor = mainFabric,
-                        panelColor = darkPanel,
-                        waistColor = waistBand,
-                        seamColor = seamColor,
-                        centerX = bfL + bfW * 0.50f,
-                        topY = bfT + bfH * 0.385f,
-                        width = bfW * 0.34f,
-                        height = bfH * 0.205f
-                    )
-                }
-
-                "Left", "Right" -> {
-                    val sideCenter = if (side == "Left") 0.55f else 0.45f
-
-                    drawFittedBoxerBriefsSide(
-                        mainColor = mainFabric,
-                        panelColor = darkPanel,
-                        waistColor = waistBand,
-                        centerX = bfL + bfW * sideCenter,
-                        topY = bfT + bfH * 0.385f,
-                        width = bfW * 0.17f,
-                        height = bfH * 0.205f
-                    )
-                }
+            if (side == "Front" || side == "Back") {
+                drawFittedBoxerBriefs(
+                    mainColor = mainFabric,
+                    panelColor = darkPanel,
+                    waistColor = waistBand,
+                    seamColor = seamColor,
+                    centerX = bfL + bfW * 0.50f,
+                    topY = bfT + bfH * 0.385f,
+                    width = bfW * 0.34f,
+                    height = bfH * 0.205f
+                )
             }
         }
     }
@@ -2193,37 +2159,24 @@ private fun parseGeminiResponse(text: String): ParsedGeminiResponse {
 }
 
 private fun getBodyOverlaySpec(side: String, useTwoPane: Boolean): BodyOverlaySpec {
-    val bounds = when (side) {
-        "Front" -> if (useTwoPane) {
-            BodyFrameBounds(0.11f, 0.08f, 0.78f, 0.84f)
-        } else {
-            BodyFrameBounds(0.10f, 0.07f, 0.80f, 0.86f)
-        }
-
-        "Back" -> if (useTwoPane) {
-            BodyFrameBounds(0.11f, 0.08f, 0.78f, 0.84f)
-        } else {
-            BodyFrameBounds(0.10f, 0.07f, 0.80f, 0.86f)
-        }
-
-        else -> if (useTwoPane) {
-            BodyFrameBounds(0.20f, 0.08f, 0.60f, 0.84f)
-        } else {
-            BodyFrameBounds(0.18f, 0.07f, 0.64f, 0.86f)
-        }
+    val bounds = if (useTwoPane) {
+        BodyFrameBounds(0.11f, 0.08f, 0.78f, 0.84f)
+    } else {
+        BodyFrameBounds(0.10f, 0.07f, 0.80f, 0.86f)
     }
 
     val hotspots = when (side) {
         "Front" -> listOf(
             // head / neck
             BodyHotspot("Face", 0.50f, 0.000001f, 0.052f),
-            BodyHotspot("Neck", 0.50f, 0.07f, 0.050f),
+            BodyHotspot("Neck", 0.50f, 0.070f, 0.050f),
 
             // shoulders and arms
-            BodyHotspot("Left Shoulder", 0.31f, 0.155f, 0.050f),
-            BodyHotspot("Right Shoulder", 0.69f, 0.155f, 0.050f),
             BodyHotspot("Left Arm", 0.065f, 0.155f, 0.048f),
             BodyHotspot("Right Arm", 0.935f, 0.155f, 0.048f),
+
+            BodyHotspot("Left Shoulder", 0.310f, 0.155f, 0.050f),
+            BodyHotspot("Right Shoulder", 0.690f, 0.155f, 0.050f),
 
             // chest
             BodyHotspot("Left Chest", 0.435f, 0.155f, 0.050f),
@@ -2231,21 +2184,21 @@ private fun getBodyOverlaySpec(side: String, useTwoPane: Boolean): BodyOverlaySp
             BodyHotspot("Right Chest", 0.565f, 0.155f, 0.050f),
 
             // abdomen / waist
-            BodyHotspot("Upper Abdomen", 0.500f, 0.305f, 0.050f),
             BodyHotspot("Left Abdomen", 0.420f, 0.305f, 0.048f),
+            BodyHotspot("Upper Abdomen", 0.500f, 0.305f, 0.050f),
             BodyHotspot("Right Abdomen", 0.580f, 0.305f, 0.048f),
 
             // thighs
-            BodyHotspot("Left Thigh", 0.390f, 0.550f, 0.048f),
-            BodyHotspot("Right Thigh", 0.610f, 0.550f, 0.048f),
+            BodyHotspot("Left Thigh", 0.390f, 0.590f, 0.048f),
+            BodyHotspot("Right Thigh", 0.610f, 0.590f, 0.048f),
 
             // knees
-            BodyHotspot("Left Knee", 0.405f, 0.675f, 0.046f),
-            BodyHotspot("Right Knee", 0.595f, 0.675f, 0.046f),
+            BodyHotspot("Left Knee", 0.405f, 0.715f, 0.046f),
+            BodyHotspot("Right Knee", 0.595f, 0.715f, 0.046f),
 
             // lower legs
-            BodyHotspot("Left Shin", 0.405f, 0.815f, 0.044f),
-            BodyHotspot("Right Shin", 0.595f, 0.815f, 0.044f)
+            BodyHotspot("Left Shin", 0.405f, 0.855f, 0.044f),
+            BodyHotspot("Right Shin", 0.595f, 0.855f, 0.044f)
         )
 
         "Back" -> listOf(
@@ -2263,34 +2216,13 @@ private fun getBodyOverlaySpec(side: String, useTwoPane: Boolean): BodyOverlaySp
             BodyHotspot("Right Calf", 0.59f, 0.715f, 0.050f)
         )
 
-        "Left" -> listOf(
-            BodyHotspot("Left Temple", 0.55f, 0.10f, 0.055f),
-            BodyHotspot("Left Jaw", 0.56f, 0.17f, 0.052f),
-            BodyHotspot("Left Neck", 0.55f, 0.24f, 0.052f),
-            BodyHotspot("Left Shoulder Side", 0.61f, 0.32f, 0.056f),
-            BodyHotspot("Left Rib", 0.59f, 0.45f, 0.056f),
-            BodyHotspot("Left Waist", 0.57f, 0.56f, 0.055f),
-            BodyHotspot("Left Hip", 0.55f, 0.67f, 0.055f),
-            BodyHotspot("Left Thigh Side", 0.53f, 0.81f, 0.055f),
-            BodyHotspot("Left Knee Side", 0.53f, 0.92f, 0.050f),
-            BodyHotspot("Left Lower Leg", 0.53f, 0.99f, 0.048f)
-        )
-
-        else -> listOf(
-            BodyHotspot("Right Temple", 0.45f, 0.10f, 0.055f),
-            BodyHotspot("Right Jaw", 0.44f, 0.17f, 0.052f),
-            BodyHotspot("Right Neck", 0.45f, 0.24f, 0.052f),
-            BodyHotspot("Right Shoulder Side", 0.39f, 0.32f, 0.056f),
-            BodyHotspot("Right Rib", 0.41f, 0.45f, 0.056f),
-            BodyHotspot("Right Waist", 0.43f, 0.56f, 0.055f),
-            BodyHotspot("Right Hip", 0.45f, 0.67f, 0.055f),
-            BodyHotspot("Right Thigh Side", 0.47f, 0.81f, 0.055f),
-            BodyHotspot("Right Knee Side", 0.47f, 0.92f, 0.050f),
-            BodyHotspot("Right Lower Leg", 0.47f, 0.99f, 0.048f)
-        )
+        else -> emptyList()
     }
 
-    return BodyOverlaySpec(bounds = bounds, hotspots = hotspots)
+    return BodyOverlaySpec(
+        bounds = bounds,
+        hotspots = hotspots
+    )
 }
 
 private fun getDetailOptions(part: String): List<String> {
@@ -2349,7 +2281,7 @@ private fun getDetailOptions(part: String): List<String> {
                 "$part - Weakness"
             )
 
-        "Left Arm", "Right Arm", "Left Elbow Back", "Right Elbow Back" ->
+        "Left Arm", "Right Arm" ->
             listOf(
                 "$part - Upper",
                 "$part - Elbow",
