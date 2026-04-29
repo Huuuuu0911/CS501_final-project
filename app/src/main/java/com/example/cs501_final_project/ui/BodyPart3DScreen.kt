@@ -518,7 +518,62 @@ private fun ChipRows(
     }
 }
 
+@Composable
+private fun ClothingOverlay(
+    overlaySpec: BodyOverlaySpec,
+    side: String
+) {
+    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
 
+    val mainFabric = Color(0xFF3A3F46).copy(alpha = 0.96f)
+    val darkPanel = Color(0xFF111827).copy(alpha = 0.98f)
+    val waistBand = Color(0xFF0F172A).copy(alpha = 0.98f)
+    val seamColor = Color(0xFF6B7280).copy(alpha = 0.70f)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onSizeChanged { canvasSize = it }
+    ) {
+        if (canvasSize.width == 0 || canvasSize.height == 0) return@Box
+
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val bfL = canvasSize.width * overlaySpec.bounds.leftRatio
+            val bfT = canvasSize.height * overlaySpec.bounds.topRatio
+            val bfW = canvasSize.width * overlaySpec.bounds.widthRatio
+            val bfH = canvasSize.height * overlaySpec.bounds.heightRatio
+
+            when (side) {
+                "Front", "Back" -> {
+                    drawFittedBoxerBriefs(
+                        mainColor = mainFabric,
+                        panelColor = darkPanel,
+                        waistColor = waistBand,
+                        seamColor = seamColor,
+                        centerX = bfL + bfW * 0.50f,
+                        topY = bfT + bfH * 0.385f,
+                        width = bfW * 0.34f,
+                        height = bfH * 0.205f
+                    )
+                }
+
+                "Left", "Right" -> {
+                    val sideCenter = if (side == "Left") 0.55f else 0.45f
+
+                    drawFittedBoxerBriefsSide(
+                        mainColor = mainFabric,
+                        panelColor = darkPanel,
+                        waistColor = waistBand,
+                        centerX = bfL + bfW * sideCenter,
+                        topY = bfT + bfH * 0.385f,
+                        width = bfW * 0.17f,
+                        height = bfH * 0.205f
+                    )
+                }
+            }
+        }
+    }
+}
 
 // 正/背面短裤:外侧竖直,两条明显的长方形裤腿,胯下 V 字
 private fun DrawScope.drawShorts(
@@ -578,6 +633,187 @@ private fun DrawScope.drawShorts(
 }
 
 // 侧视图短裤:简化为带圆角的矩形(看不到 V 字)
+private fun DrawScope.drawFittedBoxerBriefs(
+    mainColor: Color,
+    panelColor: Color,
+    waistColor: Color,
+    seamColor: Color,
+    centerX: Float,
+    topY: Float,
+    width: Float,
+    height: Float
+) {
+    val x = centerX - width / 2f
+    val y = topY
+    val w = width
+    val h = height
+
+    val waistH = h * 0.16f
+    val bodyTop = y + waistH
+
+    val bodyPath = Path().apply {
+        moveTo(x + w * 0.04f, bodyTop)
+        cubicTo(
+            x + w * 0.16f, y + h * 0.12f,
+            x + w * 0.84f, y + h * 0.12f,
+            x + w * 0.96f, bodyTop
+        )
+        cubicTo(
+            x + w * 1.02f, y + h * 0.34f,
+            x + w * 0.96f, y + h * 0.72f,
+            x + w * 0.84f, y + h * 0.96f
+        )
+        lineTo(x + w * 0.60f, y + h * 0.96f)
+        cubicTo(
+            x + w * 0.57f, y + h * 0.80f,
+            x + w * 0.55f, y + h * 0.67f,
+            x + w * 0.50f, y + h * 0.57f
+        )
+        cubicTo(
+            x + w * 0.45f, y + h * 0.67f,
+            x + w * 0.43f, y + h * 0.80f,
+            x + w * 0.40f, y + h * 0.96f
+        )
+        lineTo(x + w * 0.16f, y + h * 0.96f)
+        cubicTo(
+            x + w * 0.04f, y + h * 0.72f,
+            x - w * 0.02f, y + h * 0.34f,
+            x + w * 0.04f, bodyTop
+        )
+        close()
+    }
+    drawPath(bodyPath, mainColor)
+
+    val leftPanel = Path().apply {
+        moveTo(x + w * 0.05f, bodyTop)
+        cubicTo(
+            x + w * 0.10f, y + h * 0.34f,
+            x + w * 0.10f, y + h * 0.70f,
+            x + w * 0.16f, y + h * 0.96f
+        )
+        lineTo(x + w * 0.34f, y + h * 0.96f)
+        cubicTo(
+            x + w * 0.30f, y + h * 0.72f,
+            x + w * 0.28f, y + h * 0.40f,
+            x + w * 0.29f, bodyTop
+        )
+        close()
+    }
+    val rightPanel = Path().apply {
+        moveTo(x + w * 0.95f, bodyTop)
+        cubicTo(
+            x + w * 0.90f, y + h * 0.34f,
+            x + w * 0.90f, y + h * 0.70f,
+            x + w * 0.84f, y + h * 0.96f
+        )
+        lineTo(x + w * 0.66f, y + h * 0.96f)
+        cubicTo(
+            x + w * 0.70f, y + h * 0.72f,
+            x + w * 0.72f, y + h * 0.40f,
+            x + w * 0.71f, bodyTop
+        )
+        close()
+    }
+    drawPath(leftPanel, panelColor.copy(alpha = 0.72f))
+    drawPath(rightPanel, panelColor.copy(alpha = 0.72f))
+
+    val pouchPath = Path().apply {
+        moveTo(x + w * 0.43f, bodyTop + h * 0.03f)
+        cubicTo(
+            x + w * 0.46f, y + h * 0.45f,
+            x + w * 0.46f, y + h * 0.62f,
+            x + w * 0.50f, y + h * 0.72f
+        )
+        cubicTo(
+            x + w * 0.54f, y + h * 0.62f,
+            x + w * 0.54f, y + h * 0.45f,
+            x + w * 0.57f, bodyTop + h * 0.03f
+        )
+        close()
+    }
+    drawPath(pouchPath, Color(0xFF4B5563).copy(alpha = 0.42f))
+
+    drawRoundRect(
+        color = waistColor,
+        topLeft = Offset(x, y),
+        size = Size(w, waistH),
+        cornerRadius = CornerRadius(w * 0.08f, w * 0.08f)
+    )
+    drawRect(
+        color = Color.White.copy(alpha = 0.10f),
+        topLeft = Offset(x, y + waistH * 0.18f),
+        size = Size(w, waistH * 0.18f)
+    )
+
+    drawLine(
+        color = seamColor,
+        start = Offset(x + w * 0.50f, bodyTop + h * 0.03f),
+        end = Offset(x + w * 0.50f, y + h * 0.88f),
+        strokeWidth = w * 0.012f
+    )
+    drawLine(
+        color = Color.Black.copy(alpha = 0.22f),
+        start = Offset(x + w * 0.40f, y + h * 0.96f),
+        end = Offset(x + w * 0.50f, y + h * 0.57f),
+        strokeWidth = w * 0.010f
+    )
+    drawLine(
+        color = Color.Black.copy(alpha = 0.22f),
+        start = Offset(x + w * 0.60f, y + h * 0.96f),
+        end = Offset(x + w * 0.50f, y + h * 0.57f),
+        strokeWidth = w * 0.010f
+    )
+}
+
+private fun DrawScope.drawFittedBoxerBriefsSide(
+    mainColor: Color,
+    panelColor: Color,
+    waistColor: Color,
+    centerX: Float,
+    topY: Float,
+    width: Float,
+    height: Float
+) {
+    val x = centerX - width / 2f
+    val y = topY
+    val w = width
+    val h = height
+
+    val waistH = h * 0.16f
+
+    val bodyPath = Path().apply {
+        moveTo(x + w * 0.10f, y + waistH)
+        quadraticBezierTo(x + w * 0.50f, y + h * 0.08f, x + w * 0.90f, y + waistH)
+        cubicTo(x + w * 0.94f, y + h * 0.38f, x + w * 0.86f, y + h * 0.80f, x + w * 0.78f, y + h * 0.96f)
+        lineTo(x + w * 0.22f, y + h * 0.96f)
+        cubicTo(x + w * 0.14f, y + h * 0.80f, x + w * 0.06f, y + h * 0.38f, x + w * 0.10f, y + waistH)
+        close()
+    }
+    drawPath(bodyPath, mainColor)
+
+    drawPath(
+        Path().apply {
+            moveTo(x + w * 0.08f, y + waistH)
+            cubicTo(x + w * 0.18f, y + h * 0.35f, x + w * 0.20f, y + h * 0.75f, x + w * 0.24f, y + h * 0.96f)
+            lineTo(x + w * 0.42f, y + h * 0.96f)
+            cubicTo(x + w * 0.35f, y + h * 0.68f, x + w * 0.33f, y + h * 0.36f, x + w * 0.34f, y + waistH)
+            close()
+        },
+        panelColor.copy(alpha = 0.70f)
+    )
+
+    drawRoundRect(
+        color = waistColor,
+        topLeft = Offset(x, y),
+        size = Size(w, waistH),
+        cornerRadius = CornerRadius(w * 0.12f, w * 0.12f)
+    )
+    drawRect(
+        color = Color.White.copy(alpha = 0.10f),
+        topLeft = Offset(x, y + waistH * 0.18f),
+        size = Size(w, waistH * 0.18f)
+    )
+}
 
 @Composable
 private fun HotspotOverlay(
@@ -944,275 +1180,6 @@ private fun SymptomInputCard(
             }
         }
     }
-}
-
-
-
-
-@Composable
-private fun ClothingOverlay(
-    overlaySpec: BodyOverlaySpec,
-    side: String
-) {
-    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
-
-    val mainFabric = Color(0xFF3A3F46).copy(alpha = 0.96f)
-    val darkPanel = Color(0xFF111827).copy(alpha = 0.98f)
-    val waistBand = Color(0xFF0F172A).copy(alpha = 0.98f)
-    val seamColor = Color(0xFF6B7280).copy(alpha = 0.70f)
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .onSizeChanged { canvasSize = it }
-    ) {
-        if (canvasSize.width == 0 || canvasSize.height == 0) return@Box
-
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val bfL = canvasSize.width * overlaySpec.bounds.leftRatio
-            val bfT = canvasSize.height * overlaySpec.bounds.topRatio
-            val bfW = canvasSize.width * overlaySpec.bounds.widthRatio
-            val bfH = canvasSize.height * overlaySpec.bounds.heightRatio
-
-            when (side) {
-                "Front", "Back" -> {
-                    drawFittedBoxerBriefs(
-                        mainColor = mainFabric,
-                        panelColor = darkPanel,
-                        waistColor = waistBand,
-                        seamColor = seamColor,
-                        centerX = bfL + bfW * 0.50f,
-                        topY = bfT + bfH * 0.385f,
-                        width = bfW * 0.34f,
-                        height = bfH * 0.205f
-                    )
-                }
-
-                "Left", "Right" -> {
-                    val sideCenter = if (side == "Left") 0.55f else 0.45f
-
-                    drawFittedBoxerBriefsSide(
-                        mainColor = mainFabric,
-                        panelColor = darkPanel,
-                        waistColor = waistBand,
-                        centerX = bfL + bfW * sideCenter,
-                        topY = bfT + bfH * 0.385f,
-                        width = bfW * 0.17f,
-                        height = bfH * 0.205f
-                    )
-                }
-            }
-        }
-    }
-}
-
-private fun DrawScope.drawFittedBoxerBriefs(
-    mainColor: Color,
-    panelColor: Color,
-    waistColor: Color,
-    seamColor: Color,
-    centerX: Float,
-    topY: Float,
-    width: Float,
-    height: Float
-) {
-    val x = centerX - width / 2f
-    val y = topY
-    val w = width
-    val h = height
-
-    val waistH = h * 0.16f
-    val bodyTop = y + waistH
-
-    // 更往外扩的 boxer briefs 外轮廓
-    val bodyPath = Path().apply {
-        moveTo(x + w * 0.04f, bodyTop)
-
-        // 上边从左到右，保持轻微弧度
-        cubicTo(
-            x + w * 0.16f, y + h * 0.12f,
-            x + w * 0.84f, y + h * 0.12f,
-            x + w * 0.96f, bodyTop
-        )
-
-        // 右外侧：往外扩，不再往里收
-        cubicTo(
-            x + w * 1.02f, y + h * 0.34f,
-            x + w * 0.96f, y + h * 0.72f,
-            x + w * 0.84f, y + h * 0.96f
-        )
-
-        // 右腿内侧到裆部
-        lineTo(x + w * 0.60f, y + h * 0.96f)
-        cubicTo(
-            x + w * 0.57f, y + h * 0.80f,
-            x + w * 0.55f, y + h * 0.67f,
-            x + w * 0.50f, y + h * 0.57f
-        )
-
-        // 左腿内侧
-        cubicTo(
-            x + w * 0.45f, y + h * 0.67f,
-            x + w * 0.43f, y + h * 0.80f,
-            x + w * 0.40f, y + h * 0.96f
-        )
-
-        // 左外腿
-        lineTo(x + w * 0.16f, y + h * 0.96f)
-        cubicTo(
-            x + w * 0.04f, y + h * 0.72f,
-            x - w * 0.02f, y + h * 0.34f,
-            x + w * 0.04f, bodyTop
-        )
-
-        close()
-    }
-
-    drawPath(bodyPath, mainColor)
-
-    // 左侧深色 panel，也跟着往外扩
-    val leftPanel = Path().apply {
-        moveTo(x + w * 0.05f, bodyTop)
-        cubicTo(
-            x + w * 0.10f, y + h * 0.34f,
-            x + w * 0.10f, y + h * 0.70f,
-            x + w * 0.16f, y + h * 0.96f
-        )
-        lineTo(x + w * 0.34f, y + h * 0.96f)
-        cubicTo(
-            x + w * 0.30f, y + h * 0.72f,
-            x + w * 0.28f, y + h * 0.40f,
-            x + w * 0.29f, bodyTop
-        )
-        close()
-    }
-
-    // 右侧深色 panel
-    val rightPanel = Path().apply {
-        moveTo(x + w * 0.95f, bodyTop)
-        cubicTo(
-            x + w * 0.90f, y + h * 0.34f,
-            x + w * 0.90f, y + h * 0.70f,
-            x + w * 0.84f, y + h * 0.96f
-        )
-        lineTo(x + w * 0.66f, y + h * 0.96f)
-        cubicTo(
-            x + w * 0.70f, y + h * 0.72f,
-            x + w * 0.72f, y + h * 0.40f,
-            x + w * 0.71f, bodyTop
-        )
-        close()
-    }
-
-    drawPath(leftPanel, panelColor.copy(alpha = 0.72f))
-    drawPath(rightPanel, panelColor.copy(alpha = 0.72f))
-
-    val pouchPath = Path().apply {
-        moveTo(x + w * 0.43f, bodyTop + h * 0.03f)
-        cubicTo(
-            x + w * 0.46f, y + h * 0.45f,
-            x + w * 0.46f, y + h * 0.62f,
-            x + w * 0.50f, y + h * 0.72f
-        )
-        cubicTo(
-            x + w * 0.54f, y + h * 0.62f,
-            x + w * 0.54f, y + h * 0.45f,
-            x + w * 0.57f, bodyTop + h * 0.03f
-        )
-        close()
-    }
-
-    drawPath(pouchPath, Color(0xFF4B5563).copy(alpha = 0.42f))
-
-    // 腰带
-    drawRoundRect(
-        color = waistColor,
-        topLeft = Offset(x, y),
-        size = Size(w, waistH),
-        cornerRadius = CornerRadius(w * 0.08f, w * 0.08f)
-    )
-
-    // 腰带高光
-    drawRect(
-        color = Color.White.copy(alpha = 0.10f),
-        topLeft = Offset(x, y + waistH * 0.18f),
-        size = Size(w, waistH * 0.18f)
-    )
-
-    // 中间缝线
-    drawLine(
-        color = seamColor,
-        start = Offset(x + w * 0.50f, bodyTop + h * 0.03f),
-        end = Offset(x + w * 0.50f, y + h * 0.88f),
-        strokeWidth = w * 0.012f
-    )
-
-    // 左右裆部缝线
-    drawLine(
-        color = Color.Black.copy(alpha = 0.22f),
-        start = Offset(x + w * 0.40f, y + h * 0.96f),
-        end = Offset(x + w * 0.50f, y + h * 0.57f),
-        strokeWidth = w * 0.010f
-    )
-
-    drawLine(
-        color = Color.Black.copy(alpha = 0.22f),
-        start = Offset(x + w * 0.60f, y + h * 0.96f),
-        end = Offset(x + w * 0.50f, y + h * 0.57f),
-        strokeWidth = w * 0.010f
-    )
-}
-
-private fun DrawScope.drawFittedBoxerBriefsSide(
-    mainColor: Color,
-    panelColor: Color,
-    waistColor: Color,
-    centerX: Float,
-    topY: Float,
-    width: Float,
-    height: Float
-) {
-    val x = centerX - width / 2f
-    val y = topY
-    val w = width
-    val h = height
-
-    val waistH = h * 0.16f
-
-    val bodyPath = Path().apply {
-        moveTo(x + w * 0.10f, y + waistH)
-        quadraticBezierTo(x + w * 0.50f, y + h * 0.08f, x + w * 0.90f, y + waistH)
-        cubicTo(x + w * 0.94f, y + h * 0.38f, x + w * 0.86f, y + h * 0.80f, x + w * 0.78f, y + h * 0.96f)
-        lineTo(x + w * 0.22f, y + h * 0.96f)
-        cubicTo(x + w * 0.14f, y + h * 0.80f, x + w * 0.06f, y + h * 0.38f, x + w * 0.10f, y + waistH)
-        close()
-    }
-
-    drawPath(bodyPath, mainColor)
-
-    drawPath(
-        Path().apply {
-            moveTo(x + w * 0.08f, y + waistH)
-            cubicTo(x + w * 0.18f, y + h * 0.35f, x + w * 0.20f, y + h * 0.75f, x + w * 0.24f, y + h * 0.96f)
-            lineTo(x + w * 0.42f, y + h * 0.96f)
-            cubicTo(x + w * 0.35f, y + h * 0.68f, x + w * 0.33f, y + h * 0.36f, x + w * 0.34f, y + waistH)
-            close()
-        },
-        panelColor.copy(alpha = 0.70f)
-    )
-
-    drawRoundRect(
-        color = waistColor,
-        topLeft = Offset(x, y),
-        size = Size(w, waistH),
-        cornerRadius = CornerRadius(w * 0.12f, w * 0.12f)
-    )
-
-    drawRect(
-        color = Color.White.copy(alpha = 0.10f),
-        topLeft = Offset(x, y + waistH * 0.18f),
-        size = Size(w, waistH * 0.18f)
-    )
 }
 
 @Composable
@@ -2273,29 +2240,27 @@ private fun getBodyOverlaySpec(side: String, useTwoPane: Boolean): BodyOverlaySp
             BodyHotspot("Right Thigh", 0.610f, 0.550f, 0.048f),
 
             // knees
-            BodyHotspot("Left Knee", 0.405f, 0.715f, 0.046f),
-            BodyHotspot("Right Knee", 0.595f, 0.715f, 0.046f),
+            BodyHotspot("Left Knee", 0.405f, 0.675f, 0.046f),
+            BodyHotspot("Right Knee", 0.595f, 0.675f, 0.046f),
 
             // lower legs
-            BodyHotspot("Left Shin", 0.405f, 0.855f, 0.044f),
-            BodyHotspot("Right Shin", 0.595f, 0.855f, 0.044f)
+            BodyHotspot("Left Shin", 0.405f, 0.815f, 0.044f),
+            BodyHotspot("Right Shin", 0.595f, 0.815f, 0.044f)
         )
 
         "Back" -> listOf(
-            BodyHotspot("Back Head", 0.50f, 0.10f, 0.060f),
-            BodyHotspot("Back Neck", 0.50f, 0.23f, 0.055f),
-            BodyHotspot("Left Upper Back", 0.43f, 0.37f, 0.060f),
-            BodyHotspot("Right Upper Back", 0.57f, 0.37f, 0.060f),
-            BodyHotspot("Mid Back", 0.50f, 0.50f, 0.060f),
-            BodyHotspot("Lower Back", 0.50f, 0.62f, 0.060f),
-            BodyHotspot("Left Elbow Back", 0.10f, 0.51f, 0.055f),
-            BodyHotspot("Right Elbow Back", 0.90f, 0.51f, 0.055f),
-            BodyHotspot("Left Glute", 0.46f, 0.72f, 0.056f),
-            BodyHotspot("Right Glute", 0.54f, 0.72f, 0.056f),
-            BodyHotspot("Left Hamstring", 0.45f, 0.82f, 0.055f),
-            BodyHotspot("Right Hamstring", 0.55f, 0.82f, 0.055f),
-            BodyHotspot("Left Calf", 0.45f, 0.94f, 0.050f),
-            BodyHotspot("Right Calf", 0.55f, 0.94f, 0.050f)
+            BodyHotspot("Back Head", 0.50f, 0.000001f, 0.060f),
+            BodyHotspot("Back Neck", 0.50f, 0.07f, 0.055f),
+            BodyHotspot("Left Upper Back", 0.43f, 0.2f, 0.060f),
+            BodyHotspot("Right Upper Back", 0.57f, 0.2f, 0.060f),
+            BodyHotspot("Mid Back", 0.50f, 0.25f, 0.060f),
+            BodyHotspot("Lower Back", 0.50f, 0.30f, 0.060f),
+            BodyHotspot("Left Glute", 0.420f, 0.4f, 0.056f),
+            BodyHotspot("Right Glute", 0.580f, 0.4f, 0.056f),
+            BodyHotspot("Left Hamstring", 0.390f, 0.5f, 0.055f),
+            BodyHotspot("Right Hamstring", 0.610f, 0.5f, 0.055f),
+            BodyHotspot("Left Calf", 0.45f, 0.715f, 0.050f),
+            BodyHotspot("Right Calf", 0.59f, 0.715f, 0.050f)
         )
 
         "Left" -> listOf(
@@ -2330,7 +2295,7 @@ private fun getBodyOverlaySpec(side: String, useTwoPane: Boolean): BodyOverlaySp
 
 private fun getDetailOptions(part: String): List<String> {
     return when (part) {
-        "Forehead", "Face", "Back Head", "Left Temple", "Right Temple", "Left Jaw", "Right Jaw" ->
+        "Face", "Back Head", "Left Temple", "Right Temple", "Left Jaw", "Right Jaw" ->
             listOf(
                 "$part - Left",
                 "$part - Center",
