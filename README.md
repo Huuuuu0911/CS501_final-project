@@ -1,322 +1,312 @@
-# CareRoute
+# CareRoute Final Report
 
-CareRoute is an Android health support application built with **Kotlin** and **Jetpack Compose**. The project was originally designed to help users describe symptoms and receive a clearer sense of what level of care they may need next. As the project evolved, it expanded beyond a simple symptom-check prototype into a more structured mobile application with **local persistence**, **profile management**, **family member support**, **history tracking**, **map integration**, and a growing foundation for **personalized health recommendations**.
+## Project Overview
 
-The current version focuses on two major goals:
+CareRoute is an Android mobile application designed to help users navigate basic health concerns more clearly and efficiently. The app allows users to select a body area, describe symptoms, answer AI-generated follow-up questions, and receive a structured care recommendation. Based on the result, the app can guide users toward emergency care, urgent care, primary care, pharmacy support, or home care.
 
-1. providing a cleaner and more practical symptom-to-care workflow for end users, and  
-2. building a more realistic Android application architecture that can support persistent health-related data and future feature growth.
+The goal of the project is not to replace doctors or provide a medical diagnosis. Instead, CareRoute is designed as a supportive health navigation tool. It helps users organize symptoms, understand the urgency level of their situation, and decide what kind of care resource may be appropriate.
 
----
+The app includes multiple major features:
 
-## Project Motivation
-
-Many health-related apps either focus only on symptom input or only on static medical information. CareRoute was created to bridge that gap with a more user-centered workflow:
-
-- help users describe symptoms more naturally,
-- guide them toward an appropriate next care step,
-- make the process more visual and less intimidating,
-- allow users to keep relevant health information in one place, and
-- support both personal and family-level health organization.
-
-The project is especially aimed at making symptom reporting and care navigation more approachable in a mobile environment.
+- User authentication through Firebase
+- Emergency guest mode for quick access
+- 3D body-part selection
+- AI-generated follow-up questions
+- AI-generated care recommendation
+- Google Maps / nearby care search
+- History archive
+- User profile and medical information
+- Family Hub for shared family health access
+- Remote database storage using Firebase Firestore
 
 ---
 
-## Project Objectives
+## Architecture
 
-The main objectives of CareRoute are:
-
-- to build an Android application with a clear and intuitive health support workflow,
-- to support symptom entry through both text-based and body-part-based interaction,
-- to provide a result screen that communicates care urgency more clearly,
-- to help users locate nearby care options through map integration,
-- to persist important information locally instead of relying only on temporary UI state,
-- to support both the primary user and family members through profile-based data organization,
-- to prepare the app for future personalized recommendations, document handling, and richer record management.
-
----
-
-## Current Version Overview
-
-The current version of CareRoute includes:
-
-- a multi-screen Android app built with Jetpack Compose,
-- symptom-check related UI flow,
-- body-part and 3D body selection support,
-- result and care guidance screens,
-- map and location support for nearby care,
-- local persistence with **Room** and **DataStore**,
-- personal profile and family member data models,
-- saved history record support,
-- imported medical record data support,
-- settings persistence support,
-- infrastructure for daily health tips and personalized checkup suggestions,
-- updated ViewModel, navigation, and settings integration.
-
-This version moves the project from a UI-heavy prototype toward a more complete and maintainable Android application.
-
----
-
-## Core User Flow
-
-CareRoute is structured around a simple but extensible user flow:
-
-**Home → Symptom Check / Body Selection → Result → Map / History / Settings**
-
-The general idea is:
-
-1. the user starts from the home screen,
-2. enters symptoms or selects a body area,
-3. receives a care-oriented result,
-4. reviews or saves that result,
-5. checks map-based care options if needed,
-6. manages personal data, family data, history, and settings through the rest of the app.
-
----
-
-## Main Features
-
-### 1. Home Dashboard
-The home screen acts as the entry point of the application. It is designed to provide a quick way to begin symptom checking and to grow into a dashboard for health-related summaries, such as tips, history previews, and quick actions.
-
-### 2. Symptom Check Workflow
-The project includes a symptom-check workflow that allows the user to move from symptom entry toward a care recommendation. This is the core functional idea behind the app.
-
-### 3. Body Part Selection
-CareRoute includes body-area selection screens to make symptom reporting more intuitive. Instead of relying only on free text, the user can indicate where discomfort or symptoms are occurring.
-
-### 4. 3D Body Interaction
-The project also includes a 3D body-view feature using SceneView. This is intended to make body-part selection more visual and interactive. It lays the groundwork for more advanced region-based symptom input and follow-up questioning.
-
-### 5. Result and Care Guidance
-After symptom-related input, the app presents a result view that communicates urgency and next-step guidance. The current design supports different levels of care guidance, such as:
-
-- emergency-level care,
-- urgent-care-level guidance,
-- lower-urgency or safer at-home follow-up guidance.
-
-### 6. Nearby Care / Map Support
-The project integrates map functionality so that users can search for nearby care locations based on the result or urgency level. This helps connect the assessment flow with a practical next action.
-
-### 7. History Support
-The app now has local support for storing previous symptom-check results. This allows the project to move toward a usable history page rather than treating every interaction as temporary.
-
-### 8. Personal Profile Management
-The current version includes local storage support for the user’s health profile, including personal and health-related fields such as:
-
-- name,
-- birth date,
-- age,
-- gender,
-- phone number,
-- height,
-- weight,
-- address,
-- allergies,
-- medications,
-- conditions,
-- emergency contact.
-
-### 9. Family Member Support
-CareRoute also supports storing family member profiles, which expands the application beyond a single-user use case. This allows the app to function more like a small family health organizer.
-
-### 10. Imported Medical Record Support
-The project now includes local data structures for imported or manually entered medical records. This is an important architectural step because it prepares the app for future upload, parsing, summarization, or record review features.
-
-### 11. Daily Health Tips
-The application includes data support for daily health tip content. The data model and local persistence layer are in place so this feature can be stored and reused instead of treated as temporary UI text.
-
-### 12. Personalized Checkup Suggestions
-The project also includes support for personalized checkup suggestions. The persistence layer is implemented so the app can store recommendation-oriented content in a structured way.
-
-### 13. Settings Persistence
-The settings portion of the app now has real local persistence support. This includes settings-related data such as:
-
-- notification preferences,
-- dark mode preference,
-- accent theme selection.
-
----
-
-## Architecture Overview
-
-CareRoute is structured with a layered Android architecture that separates UI, state management, and local data handling.
+CareRoute follows a basic MVVM-style architecture. The project separates UI, state management, remote data operations, and API logic into different layers.
 
 ### UI Layer
-The UI is built with **Jetpack Compose** and uses composable screens and reusable components. The goal of the UI layer is to remain focused on presentation and user interaction.
+
+The UI is built with Jetpack Compose and Material 3. Main screens include:
+
+- `AuthScreen.kt`
+- `HomeScreen.kt`
+- `BodyPart3DScreen.kt`
+- `MapScreen.kt`
+- `HistoryScreen.kt`
+- `SettingScreen.kt`
+- `FamilyHubScreen.kt`
+
+Compose is used to create reusable, mobile-friendly layouts. The app uses cards, buttons, text fields, sliders, chips, and scrollable layouts to organize information clearly. Most screens are designed with a mobile-first layout, using vertical flows and card-based sections.
 
 ### Navigation Layer
-Navigation is managed through a central navigation structure that coordinates the primary app routes and screen transitions.
 
-### ViewModel Layer
-The app uses a ViewModel-based state holder to coordinate screen state, business logic, and data flow between the UI and the persistence layer.
-
-### Local Data Layer
-The local data layer is implemented with **Room** and includes:
-
-- entities,
-- DAO interfaces,
-- database configuration,
-- type converters,
-- entity-to-model mappers.
-
-### Preferences Layer
-For lightweight key-value state, the project uses **DataStore**, which is more appropriate than a relational database for simple app preference values.
-
-### Service / Integration Layer
-The project also includes integration-ready or service-related support for APIs such as map/location services and Gemini-related health guidance functionality.
-
----
-
-## Local Persistence Design
-
-One of the most important improvements in the current version is the addition of local persistence.
-
-### Room Database
-Room is used for structured local storage. The current database layer includes entities for:
-
-- self profile,
-- family members,
-- saved history records,
-- imported medical records,
-- app settings,
-- daily health tips,
-- checkup suggestions.
-
-### DAO Layer
-The DAO layer is responsible for querying, inserting, updating, and deleting local data. This allows the rest of the application to interact with structured data through clearly defined functions rather than raw SQL scattered across the app.
-
-### Type Converters
-Because Room cannot directly store all Kotlin types, the project includes converters for values such as:
-
-- enums,
-- lists of strings.
-
-### Entity Mappers
-Entity mappers are used to convert between Room entities and app-facing data models. This keeps the database layer and UI layer better separated.
-
-### DataStore
-DataStore is used for lightweight preferences, such as:
-
-- selected person state,
-- legacy migration flags.
-
-This complements Room by handling simpler preference-like values more efficiently.
-
----
-
-## Data Model Scope
-
-The current persistence layer supports the following categories of data:
-
-### User and Family Data
-- self profile information,
-- family member information.
-
-### Symptom and Assessment Data
-- saved history records,
-- symptom-related summaries,
-- care-level result information.
-
-### Medical Record Data
-- imported or manually entered medical notes,
-- findings,
-- follow-up recommendations,
-- raw text storage.
-
-### Recommendation Data
-- daily health tips,
-- checkup suggestions.
-
-### App Configuration Data
-- settings,
-- preferences,
-- selected person state.
-
----
-
-## Technology Stack
-
-### Core Language and Platform
-- **Kotlin**
-- **Android**
-
-### UI
-- **Jetpack Compose**
-- **Material 3**
-
-### Local Persistence
-- **Room**
-- **DataStore Preferences**
-
-### State Management
-- **ViewModel**
-- Compose state / state hoisting patterns
-
-### Networking and API Support
-- **Retrofit**
-- **Gson Converter**
-- **OkHttp Logging Interceptor**
-
-### Maps and Location
-- **Google Maps SDK**
-- **Google Maps Compose**
-- **Google Play Services Location**
-- **Google Places**
-
-### 3D Interaction
-- **SceneView**
-- Filament-related rendering support
-
----
-
-## Project Structure
-
-A simplified structure of the project is shown below:
+Navigation is handled through Navigation Compose in `AppNav.kt`. The main app flow connects:
 
 ```text
-app/
-└── src/main/java/com/example/cs501_final_project/
-    ├── data/
-    │   ├── local/
-    │   │   ├── AppSettingsEntity.kt
-    │   │   ├── CareRouteConverters.kt
-    │   │   ├── CareRouteDao.kt
-    │   │   ├── CareRouteDatabase.kt
-    │   │   ├── CheckupSuggestionEntity.kt
-    │   │   ├── DailyHealthTipEntity.kt
-    │   │   ├── EntityMappers.kt
-    │   │   ├── FamilyMemberEntity.kt
-    │   │   ├── ImportedMedicalRecordEntity.kt
-    │   │   ├── SavedCheckRecordEntity.kt
-    │   │   └── SelfProfileEntity.kt
-    │   ├── preferences/
-    │   │   └── AppPreferencesRepository.kt
-    │   └── AppModels.kt
-    │   └── AuthModels.kt
-    │   └── AuthViewModel.kt
-    │   └── CareRouteViewModel.kt
-    │   └── GeminiRepository.kt
-    ├── navigation/
-    │   └── AppNav.kt
-    ├── network/
-    │   └── GeminiApiService.kt
-    │   └── GeminiModels.kt
-    ├── ui/
-    │   ├── components/
-    │   │   ├── AppButton.kt
-    │   │   └── AppCard.kt
-    │   ├── theme/
-    │   │   ├── CareRouteTheme.kt
-    │   │   └── Color.kt
-    │   ├── AuthScreen.kt
-    │   ├── BodyPart3DScreen.kt
-    │   ├── BodyPartScreen.kt
-    │   ├── HistoryScreen.kt
-    │   ├── HomeScreen.kt
-    │   ├── MapScreen.kt
-    │   ├── ResultScreen.kt
-    │   ├── SettingScreen.kt
-    │   └── TriageScreen.kt
-    └── MainActivity.kt
+Login / Emergency Mode
+→ Home
+→ Body Selection
+→ Symptom Detail
+→ AI Follow-up
+→ Result
+→ Map / History / Settings / Family Hub
+```
+
+Arguments are passed between screens when needed, such as the selected body part, symptom description, and pain level. This creates a clear step-by-step user journey.
+
+### ViewModel Layer
+
+The main ViewModels are:
+
+- `AuthViewModel`
+- `CareRouteViewModel`
+
+`AuthViewModel` manages Firebase login, registration, logout, password reset, and emergency guest mode.
+
+`CareRouteViewModel` manages user profile data, selected family member context, history records, imported medical records, settings, daily health tips, and checkup suggestions. The newest version stores user-related data remotely in Firestore instead of relying on local Room storage, which prevents different users from sharing the same local profile.
+
+### Repository Layer
+
+The app uses repository-style classes for external data and remote operations:
+
+- `GeminiRepository.kt`
+- `RemoteFamilyRepository.kt`
+
+`GeminiRepository` handles Gemini API calls and prompt formatting.
+
+`RemoteFamilyRepository` handles Firestore operations for Family Hub features, including creating families, joining families, approving requests, inviting users by email, and switching the active family profile view.
+
+This separation keeps API and database logic outside the UI layer, making the code easier to understand and maintain.
+
+---
+
+## Database Usage and Schema
+
+The final app uses Firebase Firestore as the main remote database. Earlier versions used local Room storage, but the final direction moved toward Firestore because the app supports login accounts, family sharing, and cross-device persistence.
+
+### Main Firestore Structure
+
+The general Firestore structure is:
+
+```text
+users
+ └── {uid}
+      ├── uid
+      ├── email
+      ├── name
+      ├── familyId
+      ├── activeViewUid
+      ├── createdAt
+      ├── lastLoginAt
+      └── updatedAt
+```
+
+Each authenticated user has one document under `users`.
+
+### CareRoute User Data
+
+Each user's health-related app data is stored under:
+
+```text
+users
+ └── {uid}
+      └── careRouteData
+           └── main
+                ├── profile
+                │    └── self
+                ├── settings
+                │    └── app
+                ├── historyRecords
+                ├── importedMedicalRecords
+                ├── dailyHealthTips
+                └── checkupSuggestions
+```
+
+This schema separates each user's profile, settings, health history, imported records, daily tips, and checkup suggestions. Since the data is stored under the authenticated user's UID, one user's information does not overwrite another user's information.
+
+### Family Hub Schema
+
+Family Hub uses a separate `families` collection:
+
+```text
+families
+ └── {familyId}
+      ├── id
+      ├── familyName
+      ├── ownerUid
+      ├── memberUids
+      ├── createdAt
+      └── updatedAt
+```
+
+Each family also contains subcollections:
+
+```text
+families
+ └── {familyId}
+      ├── profiles
+      │    └── {uid}
+      ├── joinRequests
+      │    └── {requesterUid}
+      └── invitations
+           └── {email}
+```
+
+The Family Hub supports the following rules:
+
+- A user can only belong to one family at a time.
+- A user can create a family only if they are not already in one.
+- A user can request to join an existing family.
+- Current family members can approve or reject join requests.
+- A family member can invite another user by email.
+- Family members can view another member's profile through `activeViewUid`.
+
+This does not change the Firebase login session. Instead, it changes the selected profile context inside the app, which is safer than actually logging in as another user.
+
+---
+
+## APIs, Sensors, and Usage
+
+### Firebase Authentication
+
+Firebase Authentication is used for account creation, login, logout, and password reset. The app supports email/password authentication. It also includes an Emergency Mode that allows users to enter the app quickly without creating an account.
+
+For security and data separation, Emergency Mode does not use the previous Firebase session. The app signs out the current Firebase user before entering Emergency Mode, preventing emergency access from accidentally showing a previously logged-in user's data.
+
+### Firebase Firestore
+
+Firestore is used as the main cloud database. It stores user profile data, history records, medical records, app settings, family information, join requests, and invitations. Firestore listeners allow the app to update the UI when remote data changes.
+
+### Gemini API
+
+Gemini API is used for AI-assisted symptom support. The app uses Gemini for several tasks:
+
+- Generating follow-up questions based on the selected body part, symptom description, pain level, and user profile
+- Generating structured care recommendations
+- Producing urgency levels and suggested care types
+- Generating daily health tips
+- Generating checkup suggestions
+- Structuring manually entered medical records
+
+The Gemini response is requested in a structured format so that the app can parse important fields such as urgency, care level, summary, warning signs, and map query.
+
+### Google Maps
+
+Google Maps is used to support nearby care search. Based on the AI recommendation, the app can guide users toward relevant care resources such as:
+
+- Emergency room
+- Urgent care
+- Primary care clinic
+- Pharmacy
+
+The current version supports map-based search and care navigation. A future improvement would be to use the Places API to automatically fetch, rank, and display the closest three facilities directly inside the app.
+
+### Sensor / Interaction Usage
+
+The app includes mobile-specific interaction design through the 3D body selection screen. Users can interact with a visual body model and select symptom areas. This improves usability compared with only typing symptoms into a form.
+
+Voice input and additional sensor-based features were considered as future improvements. The current implementation focuses on stable touch-based interaction, location/map support, and AI-guided symptom flow.
+
+---
+
+## Team Responsibilities and Contributions
+
+Our team divided the work across UI, architecture, API integration, database work, and testing.
+
+### Jiahao Hu
+
+Jiahao focused on the main app structure, Compose UI, navigation flow, AI integration, and database redesign. His contributions included:
+
+- Building the main Compose screens
+- Connecting the core navigation flow
+- Implementing the AI symptom-check process
+- Integrating Gemini API logic
+- Refactoring user data from local storage to Firestore
+- Debugging Firebase Authentication and session issues
+- Improving Emergency Mode behavior
+- Designing and revising the Family Hub structure
+
+### Zhi Gao
+
+Zhi Gao contributed to app testing, UI feedback, project debugging, and presentation preparation. His work helped improve the usability and consistency of the app. He also helped test the user flow and identify areas where the app needed clearer navigation or better visual organization.
+
+Overall, the project required significant collaboration, especially during debugging and integration. Many issues involved connecting multiple systems together, such as Firebase Auth, Firestore, Gemini API, Navigation Compose, and Google Maps.
+
+---
+
+## AI Reflection
+
+AI was used throughout the semester as a development support tool. It helped with brainstorming, architecture planning, debugging, UI wording, and code explanation. However, AI was not used blindly. Suggestions were reviewed, tested, and often modified before being accepted.
+
+### How AI Was Used Across the Semester
+
+AI was used to help:
+
+- Brainstorm the app idea and user flow
+- Break the app into screens and features
+- Plan the MVVM architecture
+- Debug Compose and Firebase errors
+- Improve prompt structure for Gemini API
+- Organize the final README/report
+
+AI was especially helpful when the project involved unfamiliar or complicated integrations, such as Firestore schema design, Firebase session handling, and structured Gemini API responses.
+
+### Where AI Influenced Architecture, Code, Testing, and UX
+
+AI influenced the architecture by helping identify the need for clearer separation between UI, ViewModel, repository, and database layers. For example, the project originally mixed some local state and database behavior in ways that caused users to share the same local profile. AI helped identify that the better long-term structure was to store user-specific data remotely under each Firebase UID.
+
+For UX, AI helped simplify the presentation of health information. Instead of showing a long paragraph from Gemini, the app uses structured fields such as summary, urgency, care level, warning signs, and next steps. This makes the result easier for users to understand on a mobile screen.
+
+For testing, AI helped interpret error messages and suggest fixes. For example, issues around Firebase session persistence, password reset, and Firestore schema conflicts were diagnosed and fixed through iterative debugging.
+
+### What AI Helped Accelerate
+
+AI helped accelerate:
+
+- Debugging Kotlin and Compose errors
+- Writing repetitive model and repository code
+- Creating structured prompts for Gemini
+- Improving presentation and documentation language
+- Comparing different architecture options
+
+Without AI support, many integration problems would have taken much longer to research manually.
+
+### Why Certain AI Suggestions Were Rejected
+
+Not every AI suggestion was accepted. Some were rejected because they were too complex for the project timeline or not stable enough for the milestone.
+
+For example:
+
+- Some early suggestions used too many local database layers, which made user data separation harder.
+- Some suggested Firestore structures were too complicated and created many errors during implementation.
+- Some health-related AI outputs were too diagnostic, so the app was adjusted to frame Gemini as a support tool, not a doctor.
+
+---
+
+## Current Limitations and Future Improvements
+
+CareRoute has a strong foundation, but there are still areas for future improvement.
+
+Current limitations include:
+
+- The app does not provide real medical diagnosis.
+- Emergency Mode does not persist data after leaving the session.
+- Family Hub supports viewing family profiles, but deeper shared health record permissions could be improved.
+- More testing is needed for edge cases such as network failure, invalid API keys, and incomplete profiles.
+
+Future improvements could include:
+
+- Automatic nearby facility ranking by distance
+- Better family permission controls
+- Push notifications for family join requests
+- Offline mode for basic symptom entry
+- More accessibility testing
+
+---
+
+## Conclusion
+
+CareRoute demonstrates a strong foundation for a mobile health navigation app. It includes multiple Compose screens, ViewModel-based state management, Firebase Authentication, Firestore database usage, Gemini API integration, Google Maps support, and a Family Hub system.
+
+The project shows clear progress toward a complete app while still keeping the scope realistic. The final version focuses on stable architecture, meaningful integrations, and a usable mobile experience. While future improvements are still possible, the current implementation provides a clear direction and a strong base for continued development.
