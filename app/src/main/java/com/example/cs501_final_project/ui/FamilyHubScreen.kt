@@ -151,6 +151,8 @@ private fun FamilyHubContent(
     var selectedMember by remember { mutableStateOf<CloudFamilyMember?>(null) }
     var symptoms by remember { mutableStateOf("") }
     var painLevel by remember { mutableFloatStateOf(3f) }
+    var showLeaveConfirm by remember { mutableStateOf(false) }
+    var showDisbandConfirm by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier
@@ -279,6 +281,91 @@ private fun FamilyHubContent(
                                 text = "You created this family, so you can approve or reject join requests.",
                                 style = MaterialTheme.typography.bodySmall
                             )
+
+                            OutlinedButton(
+                                enabled = !viewModel.isBusy,
+                                onClick = {
+                                    showDisbandConfirm = true
+                                    showLeaveConfirm = false
+                                }
+                            ) {
+                                Text("Disband Family")
+                            }
+
+                            if (showDisbandConfirm) {
+                                Text(
+                                    text = "This will remove the family for everyone and clear all family records in the cloud.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(
+                                        enabled = !viewModel.isBusy,
+                                        onClick = {
+                                            careRouteViewModel.selectPerson("self")
+                                            selectedMember = null
+                                            symptoms = ""
+                                            painLevel = 3f
+                                            showDisbandConfirm = false
+                                            viewModel.disbandFamily()
+                                        }
+                                    ) {
+                                        Text("Confirm Disband")
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = { showDisbandConfirm = false }
+                                    ) {
+                                        Text("Cancel")
+                                    }
+                                }
+                            }
+                        } else {
+                            Text(
+                                text = "You can leave this family at any time. Your account will no longer appear in this family.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+
+                            OutlinedButton(
+                                enabled = !viewModel.isBusy,
+                                onClick = {
+                                    showLeaveConfirm = true
+                                    showDisbandConfirm = false
+                                }
+                            ) {
+                                Text("Leave Family")
+                            }
+
+                            if (showLeaveConfirm) {
+                                Text(
+                                    text = "This will remove your account from this family and clear your family link.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(
+                                        enabled = !viewModel.isBusy,
+                                        onClick = {
+                                            careRouteViewModel.selectPerson("self")
+                                            selectedMember = null
+                                            symptoms = ""
+                                            painLevel = 3f
+                                            showLeaveConfirm = false
+                                            viewModel.leaveFamily()
+                                        }
+                                    ) {
+                                        Text("Confirm Leave")
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = { showLeaveConfirm = false }
+                                    ) {
+                                        Text("Cancel")
+                                    }
+                                }
+                            }
                         }
                     }
                 }

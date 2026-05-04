@@ -306,6 +306,44 @@ class FamilyHubViewModel : ViewModel() {
         }
     }
 
+
+    fun leaveFamily() {
+        val family = selectedFamily ?: run {
+            message = "You are not in a family yet."
+            return
+        }
+
+        viewModelScope.launch {
+            runBusy {
+                repo.leaveFamily(family.id)
+                families = emptyList()
+                clearActiveFamily()
+                message = "You left the family."
+            }
+        }
+    }
+
+    fun disbandFamily() {
+        val family = selectedFamily ?: run {
+            message = "You are not in a family yet."
+            return
+        }
+
+        if (family.ownerUid != currentUserUid) {
+            message = "Only the family owner can disband this family."
+            return
+        }
+
+        viewModelScope.launch {
+            runBusy {
+                repo.disbandFamily(family.id)
+                families = emptyList()
+                clearActiveFamily()
+                message = "Family disbanded."
+            }
+        }
+    }
+
     fun confirmMimic(memberName: String) {
         message = "Now asking as $memberName."
     }

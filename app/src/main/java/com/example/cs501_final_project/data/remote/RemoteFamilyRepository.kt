@@ -664,6 +664,90 @@ class RemoteFamilyRepository {
         ).await()
     }
 
+    suspend fun leaveFamily(familyId: String) {
+        ensureUserDocument()
+
+        val family = requireFamilyMember(familyId)
+        val uid = currentUid()
+
+        if (family.ownerUid == uid) {
+            throw IllegalStateException("The family owner should disband the family instead of leaving it.")
+        }
+
+        val time = now()
+        val familyRef = db.collection("families").document(familyId)
+        val userRef = db.collection("users").document(uid)
+        val memberRef = familyRef.collection("members").document(uid)
+        val requestRef = familyRef.collection("joinRequests").document(uid)
+
+        val recordDocs = familyRef.collection("records")
+            .whereEqualTo("memberId", uid)
+            .get()
+            .await()
+            .documents
+
+        db.runBatch { batch ->
+            batch.update(
+                familyRef,
+                "memberUids",
+                FieldValue.arrayRemove(uid)
+            )
+            batch.update(familyRef, "updatedAt", time)
+            batch.update(
+                familyRef,
+                FieldPath.of("roles", uid),
+                FieldValue.delete()
+            )
+
+            batch.set(
+                userRef,
+                mapOf(
+                    "selectedFamilyId" to "",
+                    "familyCode" to "",
+                    "updatedAt" to time
+                ),
+                SetOptions.merge()
+            )
+
+            batch.delete(memberRef)
+            batch.delete(requestRef)
+            recordDocs.forEach { doc ->
+                batch.delete(doc.reference)
+            }
+        }.await()
+    }
+
+    suspend fun disbandFamily(familyId: String) {
+        val family = requireFamilyOwner(familyId)
+        val time = now()
+        val familyRef = db.collection("families").document(familyId)
+
+        val memberDocs = familyRef.collection("members").get().await().documents
+        val recordDocs = familyRef.collection("records").get().await().documents
+        val requestDocs = familyRef.collection("joinRequests").get().await().documents
+        val inviteDocs = familyRef.collection("emailInvites").get().await().documents
+
+        db.runBatch { batch ->
+            family.memberUids.forEach { memberUid ->
+                batch.set(
+                    db.collection("users").document(memberUid),
+                    mapOf(
+                        "selectedFamilyId" to "",
+                        "familyCode" to "",
+                        "updatedAt" to time
+                    ),
+                    SetOptions.merge()
+                )
+            }
+
+            memberDocs.forEach { doc -> batch.delete(doc.reference) }
+            recordDocs.forEach { doc -> batch.delete(doc.reference) }
+            requestDocs.forEach { doc -> batch.delete(doc.reference) }
+            inviteDocs.forEach { doc -> batch.delete(doc.reference) }
+            batch.delete(familyRef)
+        }.await()
+    }
+
     suspend fun inviteByEmail(
         familyId: String,
         inviteeEmail: String
