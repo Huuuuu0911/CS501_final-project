@@ -3,6 +3,7 @@ package com.example.cs501_final_project.data.remote
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.UserProfileChangeRequest
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -11,6 +12,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import kotlin.random.Random
 
 class RemoteFamilyRepository {
 
@@ -38,8 +40,17 @@ class RemoteFamilyRepository {
         return auth.currentUser != null
     }
 
+    fun currentUserUid(): String {
+        return auth.currentUser?.uid ?: ""
+    }
+
     fun currentUserEmail(): String {
         return currentEmail()
+    }
+
+    private fun isValidEmail(value: String): Boolean {
+        val clean = value.trim()
+        return clean.contains("@") && clean.substringAfter("@").contains(".")
     }
 
     private suspend fun saveUserDocument(
@@ -65,10 +76,18 @@ class RemoteFamilyRepository {
                 "uid" to user.uid,
                 "email" to email,
                 "name" to finalName,
-                "birthday" to "",
-                "phone" to "",
+                "birthDate" to "",
+                "age" to "",
+                "gender" to "",
+                "height" to "",
+                "weight" to "",
+                "address" to "",
+                "allergies" to "",
+                "medications" to "",
+                "conditions" to "",
+                "emergencyContact" to "",
                 "selectedFamilyId" to "",
-                "familyIds" to emptyList<String>(),
+                "familyCode" to "",
                 "createdAt" to time,
                 "lastLoginAt" to time,
                 "updatedAt" to time
@@ -101,6 +120,10 @@ class RemoteFamilyRepository {
         val cleanEmail = email.trim()
         val cleanName = name.trim().ifBlank { "User" }
 
+        if (!isValidEmail(cleanEmail)) {
+            throw IllegalArgumentException("Please use an email address.")
+        }
+
         val result = auth.createUserWithEmailAndPassword(
             cleanEmail,
             password
@@ -125,6 +148,10 @@ class RemoteFamilyRepository {
         email: String,
         password: String
     ) {
+        if (!isValidEmail(email)) {
+            throw IllegalArgumentException("Please use an email address.")
+        }
+
         auth.signInWithEmailAndPassword(
             email.trim(),
             password
@@ -137,14 +164,142 @@ class RemoteFamilyRepository {
         auth.signOut()
     }
 
+    private suspend fun currentUserAlreadyHasFamily(uid: String = currentUid()): Boolean {
+        val userSnapshot = db.collection("users")
+            .document(uid)
+            .get()
+            .await()
+
+        val selectedFamilyId = userSnapshot.getString("selectedFamilyId").orEmpty()
+        if (selectedFamilyId.isNotBlank()) return true
+
+        val familySnapshot = db.collection("families")
+            .whereArrayContains("memberUids", uid)
+            .limit(1)
+            .get()
+            .await()
+
+        return familySnapshot.documents.isNotEmpty()
+    }
+
+    private suspend fun requireNoFamilyMembership() {
+        if (currentUserAlreadyHasFamily()) {
+            throw IllegalStateException("Each user can only belong to one family.")
+        }
+    }
+
+    private suspend fun generateUniqueFamilyCode(): String {
+        repeat(20) {
+            val candidate = Random.nextInt(100000, 1000000).toString()
+            val snapshot = db.collection("families")
+                .whereEqualTo("familyCode", candidate)
+                .limit(1)
+                .get()
+                .await()
+
+            if (snapshot.documents.isEmpty()) return candidate
+        }
+
+        throw IllegalStateException("Could not generate a family code. Please try again.")
+    }
+
+    private fun linkedMemberFromUserSnapshot(
+        snapshot: DocumentSnapshot,
+        familyId: String,
+        relationship: String,
+        createdByUid: String,
+        time: Long,
+        fallbackEmail: String = "",
+        fallbackName: String = "User"
+    ): CloudFamilyMember {
+        val uid = snapshot.id
+        val email = snapshot.getString("email").orEmpty().ifBlank { fallbackEmail }
+        val name = snapshot.getString("name").orEmpty().ifBlank { fallbackName.ifBlank { email.ifBlank { "User" } } }
+
+        return CloudFamilyMember(
+            id = uid,
+            familyId = familyId,
+            name = name,
+            email = email,
+            relationship = relationship,
+            birthDate = snapshot.getString("birthDate").orEmpty().ifBlank {
+                snapshot.getString("birthday").orEmpty()
+            },
+            age = snapshot.getString("age").orEmpty(),
+            gender = snapshot.getString("gender").orEmpty(),
+            height = snapshot.getString("height").orEmpty(),
+            weight = snapshot.getString("weight").orEmpty(),
+            address = snapshot.getString("address").orEmpty(),
+            allergies = snapshot.getString("allergies").orEmpty(),
+            medications = snapshot.getString("medications").orEmpty(),
+            conditions = snapshot.getString("conditions").orEmpty(),
+            emergencyContact = snapshot.getString("emergencyContact").orEmpty(),
+            linkedUserUid = uid,
+            linkedUserEmail = email,
+            createdByUid = createdByUid,
+            createdAt = time,
+            updatedAt = time
+        )
+    }
+
+    private suspend fun resolveFamilyByCode(familyCode: String): CloudFamily {
+        val cleanCode = familyCode.trim()
+
+        if (cleanCode.length != 6 || !cleanCode.all { it.isDigit() }) {
+            throw IllegalArgumentException("Please enter a 6-digit family code.")
+        }
+
+        val snapshot = db.collection("families")
+            .whereEqualTo("familyCode", cleanCode)
+            .limit(1)
+            .get()
+            .await()
+
+        val document = snapshot.documents.firstOrNull()
+            ?: throw IllegalArgumentException("No family found with that code.")
+
+        return document.toObject(CloudFamily::class.java)?.copy(id = document.id)
+            ?: throw IllegalStateException("Could not read family data.")
+    }
+
+    private suspend fun getFamily(familyId: String): CloudFamily {
+        val snapshot = db.collection("families")
+            .document(familyId)
+            .get()
+            .await()
+
+        return snapshot.toObject(CloudFamily::class.java)?.copy(id = snapshot.id)
+            ?: throw IllegalArgumentException("Family not found.")
+    }
+
+    private suspend fun requireFamilyOwner(familyId: String): CloudFamily {
+        val family = getFamily(familyId)
+        if (family.ownerUid != currentUid()) {
+            throw IllegalStateException("Only the family creator can manage join requests.")
+        }
+        return family
+    }
+
+    private suspend fun requireFamilyMember(familyId: String): CloudFamily {
+        val family = getFamily(familyId)
+        if (!family.memberUids.contains(currentUid())) {
+            throw IllegalStateException("Only family members can invite people.")
+        }
+        return family
+    }
+
     suspend fun createFamily(familyName: String): String {
         ensureUserDocument()
+        requireNoFamilyMembership()
 
         val uid = currentUid()
         val time = now()
+        val familyCode = generateUniqueFamilyCode()
 
         val familyRef = db.collection("families").document()
         val userRef = db.collection("users").document(uid)
+        val userSnapshot = userRef.get().await()
+        val memberRef = familyRef.collection("members").document(uid)
 
         val cleanFamilyName = familyName.trim().ifBlank {
             "${currentName()}'s Family"
@@ -153,42 +308,41 @@ class RemoteFamilyRepository {
         val family = CloudFamily(
             id = familyRef.id,
             familyName = cleanFamilyName,
+            familyCode = familyCode,
             ownerUid = uid,
+            ownerEmail = currentEmail(),
             memberUids = listOf(uid),
             roles = mapOf(uid to "owner"),
             createdAt = time,
             updatedAt = time
         )
 
-        familyRef.set(family).await()
-
-        val memberRef = familyRef.collection("members").document()
-
-        val meMember = CloudFamilyMember(
-            id = memberRef.id,
+        val meMember = linkedMemberFromUserSnapshot(
+            snapshot = userSnapshot,
             familyId = familyRef.id,
-            name = currentName().ifBlank { "Me" },
             relationship = "Me",
-            birthday = "",
-            linkedUserUid = uid,
             createdByUid = uid,
-            createdAt = time,
-            updatedAt = time
+            time = time,
+            fallbackEmail = currentEmail(),
+            fallbackName = currentName()
         )
 
-        memberRef.set(meMember).await()
+        db.runBatch { batch ->
+            batch.set(familyRef, family)
+            batch.set(memberRef, meMember)
+            batch.set(
+                userRef,
+                mapOf(
+                    "selectedFamilyId" to familyRef.id,
+                    "familyCode" to familyCode,
+                    "lastLoginAt" to time,
+                    "updatedAt" to time
+                ),
+                SetOptions.merge()
+            )
+        }.await()
 
-        userRef.set(
-            mapOf(
-                "selectedFamilyId" to familyRef.id,
-                "familyIds" to FieldValue.arrayUnion(familyRef.id),
-                "lastLoginAt" to time,
-                "updatedAt" to time
-            ),
-            SetOptions.merge()
-        ).await()
-
-        return familyRef.id
+        return familyCode
     }
 
     fun listenMyFamilies(): Flow<List<CloudFamily>> = callbackFlow {
@@ -210,9 +364,9 @@ class RemoteFamilyRepository {
 
                 val families = snapshot?.documents?.mapNotNull { doc ->
                     doc.toObject(CloudFamily::class.java)?.copy(id = doc.id)
-                } ?: emptyList()
+                }?.sortedBy { it.createdAt } ?: emptyList()
 
-                trySend(families)
+                trySend(families.take(1))
             }
 
         awaitClose {
@@ -224,9 +378,10 @@ class RemoteFamilyRepository {
         familyId: String,
         name: String,
         relationship: String,
-        birthday: String
+        birthDate: String
     ) {
         ensureUserDocument()
+        requireFamilyMember(familyId)
 
         val uid = currentUid()
         val time = now()
@@ -241,8 +396,9 @@ class RemoteFamilyRepository {
             familyId = familyId,
             name = name.trim(),
             relationship = relationship.trim(),
-            birthday = birthday.trim(),
+            birthDate = birthDate.trim(),
             linkedUserUid = "",
+            linkedUserEmail = "",
             createdByUid = uid,
             createdAt = time,
             updatedAt = time
@@ -263,7 +419,7 @@ class RemoteFamilyRepository {
 
                 val members = snapshot?.documents?.mapNotNull { doc ->
                     doc.toObject(CloudFamilyMember::class.java)?.copy(id = doc.id)
-                }?.sortedBy { it.createdAt } ?: emptyList()
+                }?.sortedBy { it.name.lowercase() } ?: emptyList()
 
                 trySend(members)
             }
@@ -285,6 +441,7 @@ class RemoteFamilyRepository {
         notes: String
     ) {
         ensureUserDocument()
+        requireFamilyMember(familyId)
 
         val uid = currentUid()
         val time = now()
@@ -344,21 +501,27 @@ class RemoteFamilyRepository {
         }
     }
 
-    suspend fun requestToJoinFamily(familyId: String) {
+    suspend fun requestToJoinFamily(familyCode: String) {
         ensureUserDocument()
+        requireNoFamilyMembership()
 
+        val family = resolveFamilyByCode(familyCode)
         val uid = currentUid()
-        val time = now()
-        val cleanFamilyId = familyId.trim()
 
+        if (family.memberUids.contains(uid)) {
+            throw IllegalStateException("You are already in this family.")
+        }
+
+        val time = now()
         val requestRef = db.collection("families")
-            .document(cleanFamilyId)
+            .document(family.id)
             .collection("joinRequests")
             .document(uid)
 
         val request = CloudJoinRequest(
             id = uid,
-            familyId = cleanFamilyId,
+            familyId = family.id,
+            familyCode = family.familyCode,
             requesterUid = uid,
             requesterEmail = currentEmail(),
             requesterName = currentName(),
@@ -396,14 +559,50 @@ class RemoteFamilyRepository {
     suspend fun approveJoinRequest(
         familyId: String,
         request: CloudJoinRequest,
-        role: String = "editor"
+        role: String = "member"
     ) {
+        val family = requireFamilyOwner(familyId)
         val time = now()
 
         val familyRef = db.collection("families").document(familyId)
         val requestRef = familyRef
             .collection("joinRequests")
             .document(request.requesterUid)
+        val requesterUserRef = db.collection("users").document(request.requesterUid)
+        val requesterUserSnapshot = requesterUserRef.get().await()
+
+        val existingFamilyId = requesterUserSnapshot.getString("selectedFamilyId").orEmpty()
+        if (existingFamilyId.isNotBlank() && existingFamilyId != familyId) {
+            throw IllegalStateException("This user already belongs to another family.")
+        }
+
+        if (family.memberUids.contains(request.requesterUid)) {
+            requestRef.update(
+                mapOf(
+                    "status" to "accepted",
+                    "updatedAt" to time
+                )
+            ).await()
+            return
+        }
+
+        if (existingFamilyId.isBlank() && currentUserAlreadyHasFamily(request.requesterUid)) {
+            throw IllegalStateException("This user already belongs to another family.")
+        }
+
+        val memberRef = familyRef
+            .collection("members")
+            .document(request.requesterUid)
+
+        val linkedMember = linkedMemberFromUserSnapshot(
+            snapshot = requesterUserSnapshot,
+            familyId = familyId,
+            relationship = "Family Member",
+            createdByUid = currentUid(),
+            time = time,
+            fallbackEmail = request.requesterEmail,
+            fallbackName = request.requesterName
+        )
 
         db.runBatch { batch ->
             batch.update(
@@ -424,6 +623,18 @@ class RemoteFamilyRepository {
                 role
             )
 
+            batch.set(memberRef, linkedMember, SetOptions.merge())
+
+            batch.set(
+                requesterUserRef,
+                mapOf(
+                    "selectedFamilyId" to familyId,
+                    "familyCode" to family.familyCode,
+                    "updatedAt" to time
+                ),
+                SetOptions.merge()
+            )
+
             batch.update(
                 requestRef,
                 mapOf(
@@ -438,6 +649,8 @@ class RemoteFamilyRepository {
         familyId: String,
         request: CloudJoinRequest
     ) {
+        requireFamilyOwner(familyId)
+
         val requestRef = db.collection("families")
             .document(familyId)
             .collection("joinRequests")
@@ -449,5 +662,62 @@ class RemoteFamilyRepository {
                 "updatedAt" to now()
             )
         ).await()
+    }
+
+    suspend fun inviteByEmail(
+        familyId: String,
+        inviteeEmail: String
+    ) {
+        ensureUserDocument()
+        val family = requireFamilyMember(familyId)
+        val cleanEmail = inviteeEmail.trim().lowercase()
+
+        if (!isValidEmail(cleanEmail)) {
+            throw IllegalArgumentException("Please enter a valid email address.")
+        }
+
+        val time = now()
+        val safeInviteId = cleanEmail.replace("/", "_")
+        val inviteRef = db.collection("families")
+            .document(familyId)
+            .collection("emailInvites")
+            .document(safeInviteId)
+
+        val invite = CloudFamilyInvite(
+            id = safeInviteId,
+            familyId = familyId,
+            familyCode = family.familyCode,
+            familyName = family.familyName,
+            inviterUid = currentUid(),
+            inviterName = currentName(),
+            inviterEmail = currentEmail(),
+            inviteeEmail = cleanEmail,
+            status = "sent",
+            createdAt = time,
+            updatedAt = time
+        )
+
+        val emailText = "${currentName()} invited you to join ${family.familyName} on CareRoute. " +
+                "Open CareRoute, sign in with this email, then enter family code ${family.familyCode} in Family Hub."
+
+        val mailDocument = mapOf(
+            "to" to listOf(cleanEmail),
+            "message" to mapOf(
+                "subject" to "CareRoute family invitation",
+                "text" to emailText,
+                "html" to """
+                    <p>${currentName()} invited you to join <strong>${family.familyName}</strong> on CareRoute.</p>
+                    <p>Open CareRoute, sign in with this email, then enter this Family Code in Family Hub:</p>
+                    <h2>${family.familyCode}</h2>
+                """.trimIndent()
+            ),
+            "createdAt" to time
+        )
+
+        db.runBatch { batch ->
+            batch.set(inviteRef, invite, SetOptions.merge())
+        }.await()
+
+        db.collection("mail").add(mailDocument).await()
     }
 }

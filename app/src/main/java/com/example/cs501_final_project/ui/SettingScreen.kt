@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.SettingsSuggest
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
@@ -76,9 +75,15 @@ fun SettingScreen(
 
     if (showEditDialog) {
         var tempName by rememberSaveable(profile.name) { mutableStateOf(profile.name) }
-        var tempPhone by rememberSaveable(profile.phone) { mutableStateOf(profile.phone) }
         var tempBirthDate by rememberSaveable(profile.birthDate) { mutableStateOf(profile.birthDate) }
-        var tempGender by rememberSaveable(profile.gender) { mutableStateOf(profile.gender) }
+        var tempGender by rememberSaveable(profile.gender) {
+            mutableStateOf(
+                if (profile.gender == "Male" || profile.gender == "Female") profile.gender else ""
+            )
+        }
+        var tempHeight by rememberSaveable(profile.height) { mutableStateOf(profile.height) }
+        var tempWeight by rememberSaveable(profile.weight) { mutableStateOf(profile.weight) }
+        var tempAddress by rememberSaveable(profile.address) { mutableStateOf(profile.address) }
         var tempConditions by rememberSaveable(profile.conditions) { mutableStateOf(profile.conditions) }
         var tempAllergies by rememberSaveable(profile.allergies) { mutableStateOf(profile.allergies) }
         var tempMedications by rememberSaveable(profile.medications) { mutableStateOf(profile.medications) }
@@ -94,9 +99,11 @@ fun SettingScreen(
                         viewModel.updateSelfProfile(
                             profile.copy(
                                 name = tempName.trim(),
-                                phone = tempPhone.trim(),
                                 birthDate = formatBirthDateInput(tempBirthDate),
-                                gender = tempGender.trim(),
+                                gender = tempGender,
+                                height = tempHeight.trim(),
+                                weight = tempWeight.trim(),
+                                address = tempAddress.trim(),
                                 conditions = tempConditions.trim(),
                                 allergies = tempAllergies.trim(),
                                 medications = tempMedications.trim(),
@@ -139,16 +146,6 @@ fun SettingScreen(
                     )
 
                     OutlinedTextField(
-                        value = tempPhone,
-                        onValueChange = { tempPhone = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Phone Number") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(16.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
-                    )
-
-                    OutlinedTextField(
                         value = tempBirthDate,
                         onValueChange = { tempBirthDate = formatBirthDateInput(it) },
                         modifier = Modifier.fillMaxWidth(),
@@ -166,12 +163,52 @@ fun SettingScreen(
                         }
                     )
 
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Gender",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF667085)
+                        )
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf("Male", "Female").forEach { option ->
+                                FilterChip(
+                                    selected = tempGender == option,
+                                    onClick = { tempGender = option },
+                                    label = { Text(option) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = Color(0xFFEAE6FF),
+                                        selectedLabelColor = Color(0xFF4B3BC8)
+                                    )
+                                )
+                            }
+                        }
+                    }
+
                     OutlinedTextField(
-                        value = tempGender,
-                        onValueChange = { tempGender = it },
+                        value = tempHeight,
+                        onValueChange = { tempHeight = it },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Gender") },
-                        singleLine = true,
+                        label = { Text("Height") },
+                        placeholder = { Text("Example: 5'10 or 178 cm") },
+                        shape = RoundedCornerShape(16.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = tempWeight,
+                        onValueChange = { tempWeight = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Weight") },
+                        placeholder = { Text("Example: 160 lb or 72 kg") },
+                        shape = RoundedCornerShape(16.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = tempAddress,
+                        onValueChange = { tempAddress = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Address") },
+                        placeholder = { Text("Home address or city") },
                         shape = RoundedCornerShape(16.dp)
                     )
 
@@ -207,7 +244,7 @@ fun SettingScreen(
                         onValueChange = { tempEmergencyContact = it },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Emergency Contact") },
-                        placeholder = { Text("Name and phone number") },
+                        placeholder = { Text("Name, email, or relationship") },
                         shape = RoundedCornerShape(16.dp)
                     )
                 }
@@ -296,7 +333,6 @@ fun SettingScreen(
         ) {
             ProfileHeader(
                 displayName = profile.name.ifBlank { "User" },
-                phone = profile.phone,
                 birthDate = profile.birthDate,
                 onEditClick = { showEditDialog = true }
             )
@@ -339,7 +375,6 @@ fun SettingScreen(
 @Composable
 private fun ProfileHeader(
     displayName: String,
-    phone: String,
     birthDate: String,
     onEditClick: () -> Unit
 ) {
@@ -417,11 +452,6 @@ private fun ProfileHeader(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                InfoPill(
-                    icon = Icons.Default.Phone,
-                    text = phone.ifBlank { "No phone added" }
-                )
-
                 InfoPill(
                     icon = Icons.Default.CalendarMonth,
                     text = birthDate.ifBlank { "MM / DD / YYYY" }

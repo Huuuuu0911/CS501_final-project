@@ -16,7 +16,7 @@ import androidx.room.TypeConverters
         DailyHealthTipEntity::class,
         CheckupSuggestionEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(CareRouteConverters::class)

@@ -123,14 +123,14 @@ private fun MainAppNav(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    LaunchedEffect(session.userId, session.displayName, session.isEmergencyMode) {
+    LaunchedEffect(session.userId, session.displayName, session.email, session.isEmergencyMode) {
         viewModel.selectPerson("self")
 
         if (session.isEmergencyMode) {
+            viewModel.disconnectCloudUser()
             viewModel.updateSelfProfile(
                 viewModel.selfProfile.copy(
                     name = "Emergency Guest",
-                    phone = "",
                     address = "",
                     emergencyContact = "",
                     allergies = "",
@@ -139,12 +139,10 @@ private fun MainAppNav(
                 )
             )
         } else {
-            viewModel.updateSelfProfile(
-                viewModel.selfProfile.copy(
-                    name = session.displayName.ifBlank {
-                        session.email.ifBlank { "User" }
-                    }
-                )
+            viewModel.connectCloudUser(
+                userId = session.userId,
+                email = session.email,
+                displayName = session.displayName.ifBlank { session.email.ifBlank { "User" } }
             )
         }
     }
@@ -209,7 +207,12 @@ private fun MainAppNav(
             }
 
             composable(BottomNavDestination.Family.route) {
-                FamilyHubScreen()
+                FamilyHubScreen(
+                    careRouteViewModel = viewModel,
+                    onAskAsMember = {
+                        navController.navigate("body3d")
+                    }
+                )
             }
 
             composable(BottomNavDestination.History.route) {

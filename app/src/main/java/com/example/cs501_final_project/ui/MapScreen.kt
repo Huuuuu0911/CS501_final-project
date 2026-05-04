@@ -3,7 +3,6 @@ package com.example.cs501_final_project.ui
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,8 +27,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -77,10 +74,6 @@ fun MapScreen(
             "Checkup Center" -> "primary care clinic near me"
             else -> "$category near me"
         }
-    }
-
-    val quickCategories = remember {
-        listOf("Hospital", "Pharmacy", "Urgent Care", "Checkup Center")
     }
 
     val highlightGradient = Brush.horizontalGradient(
@@ -192,32 +185,6 @@ fun MapScreen(
                         shape = RoundedCornerShape(18.dp),
                         singleLine = true
                     )
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        quickCategories.forEach { category ->
-                            FilterChip(
-                                selected = selectedCategory == category,
-                                onClick = {
-                                    selectedCategory = category
-                                    if (searchText.isBlank()) {
-                                        searchText = buildCategoryQuery(category)
-                                    }
-                                },
-                                label = { Text(category) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Color(0xFFE6F4EA),
-                                    selectedLabelColor = Color(0xFF067647),
-                                    containerColor = Color.White,
-                                    labelColor = Color(0xFF48556A)
-                                )
-                            )
-                        }
-                    }
 
                     Card(
                         modifier = Modifier

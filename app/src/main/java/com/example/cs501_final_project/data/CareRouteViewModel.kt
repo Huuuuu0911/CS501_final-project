@@ -12,10 +12,16 @@ import com.example.cs501_final_project.data.local.CareRouteDatabase
 import com.example.cs501_final_project.data.local.toEntity
 import com.example.cs501_final_project.data.local.toModel
 import com.example.cs501_final_project.data.preferences.AppPreferencesRepository
+import com.example.cs501_final_project.data.remote.CloudFamilyMember
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.UUID
 
@@ -25,7 +31,10 @@ class CareRouteViewModel(application: Application) : AndroidViewModel(applicatio
     private val preferencesRepository = AppPreferencesRepository(application)
     private val legacyPrefs = application.getSharedPreferences(LEGACY_PREFS_NAME, Application.MODE_PRIVATE)
     private val gson = Gson()
+    private val auth = FirebaseAuth.getInstance()
+    private val db = FirebaseFirestore.getInstance()
 
+    private var cloudUserId: String? = null
     private var dailyTipsByPerson: Map<String, DailyHealthTip> = emptyMap()
 
     var selfProfile by mutableStateOf(PatientProfile(name = "You"))
@@ -63,6 +72,7 @@ class CareRouteViewModel(application: Application) : AndroidViewModel(applicatio
         selfProfile = profile
         viewModelScope.launch(Dispatchers.IO) {
             dao.upsertSelfProfile(profile.toEntity())
+            syncSelfProfileToCloud(profile)
         }
     }
 
@@ -70,6 +80,7 @@ class CareRouteViewModel(application: Application) : AndroidViewModel(applicatio
         settings = updated
         viewModelScope.launch(Dispatchers.IO) {
             dao.upsertSettings(updated.toEntity())
+            syncSettingsToCloud(updated)
         }
     }
 
@@ -103,7 +114,6 @@ class CareRouteViewModel(application: Application) : AndroidViewModel(applicatio
                 age = selfProfile.age.ifBlank { calculateAgeFromBirthDate(selfProfile.birthDate) },
                 birthDate = selfProfile.birthDate,
                 gender = selfProfile.gender,
-                phone = selfProfile.phone,
                 height = selfProfile.height,
                 weight = selfProfile.weight,
                 address = selfProfile.address,
@@ -120,7 +130,6 @@ class CareRouteViewModel(application: Application) : AndroidViewModel(applicatio
                 age = member.age.ifBlank { calculateAgeFromBirthDate(member.birthDate) },
                 birthDate = member.birthDate,
                 gender = member.gender,
-                phone = "",
                 height = "",
                 weight = "",
                 address = selfProfile.address,
@@ -141,6 +150,7 @@ class CareRouteViewModel(application: Application) : AndroidViewModel(applicatio
         }
         viewModelScope.launch(Dispatchers.IO) {
             dao.upsertFamilyMember(member.toEntity())
+            syncFamilyMemberToCloud(member)
         }
     }
 
@@ -191,6 +201,11 @@ class CareRouteViewModel(application: Application) : AndroidViewModel(applicatio
             dao.deleteImportedMedicalRecordsForPerson(memberId)
             dao.deleteCheckupSuggestionsForPerson(memberId)
             dao.deleteDailyHealthTipForPerson(memberId)
+            deleteCloudDocument("familyProfiles", memberId)
+            deleteCloudDocumentsWherePersonId("historyRecords", memberId)
+            deleteCloudDocumentsWherePersonId("importedMedicalRecords", memberId)
+            deleteCloudDocumentsWherePersonId("checkupSuggestions", memberId)
+            deleteCloudDocument("dailyHealthTips", memberId)
         }
     }
 
@@ -199,6 +214,7 @@ class CareRouteViewModel(application: Application) : AndroidViewModel(applicatio
         _historyRecords.add(0, record)
         viewModelScope.launch(Dispatchers.IO) {
             dao.upsertHistoryRecord(record.toEntity())
+            syncHistoryRecordToCloud(record)
         }
     }
 
@@ -206,6 +222,7 @@ class CareRouteViewModel(application: Application) : AndroidViewModel(applicatio
         _historyRecords.removeAll { it.id == recordId }
         viewModelScope.launch(Dispatchers.IO) {
             dao.deleteHistoryRecord(recordId)
+            deleteCloudDocument("historyRecords", recordId)
         }
     }
 
@@ -235,6 +252,7 @@ class CareRouteViewModel(application: Application) : AndroidViewModel(applicatio
         _importedMedicalRecords.add(0, record)
         viewModelScope.launch(Dispatchers.IO) {
             dao.upsertImportedMedicalRecord(record.toEntity())
+            syncImportedMedicalRecordToCloud(record)
         }
     }
 
@@ -242,6 +260,7 @@ class CareRouteViewModel(application: Application) : AndroidViewModel(applicatio
         _importedMedicalRecords.removeAll { it.id == recordId }
         viewModelScope.launch(Dispatchers.IO) {
             dao.deleteImportedMedicalRecord(recordId)
+            deleteCloudDocument("importedMedicalRecords", recordId)
         }
     }
 
@@ -251,6 +270,8 @@ class CareRouteViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch(Dispatchers.IO) {
             dao.clearHistoryRecords()
             dao.clearImportedMedicalRecords()
+            clearCloudCollection("historyRecords")
+            clearCloudCollection("importedMedicalRecords")
         }
     }
 
@@ -289,6 +310,7 @@ class CareRouteViewModel(application: Application) : AndroidViewModel(applicatio
         }
         viewModelScope.launch(Dispatchers.IO) {
             dao.upsertDailyHealthTip(tip.toEntity())
+            syncDailyHealthTipToCloud(tip)
         }
     }
 
@@ -306,6 +328,8 @@ class CareRouteViewModel(application: Application) : AndroidViewModel(applicatio
                 personId = personId,
                 suggestions = suggestions.map { it.toEntity() }
             )
+            deleteCloudDocumentsWherePersonId("checkupSuggestions", personId)
+            suggestions.forEach { syncCheckupSuggestionToCloud(it) }
         }
     }
 
@@ -351,8 +375,7 @@ class CareRouteViewModel(application: Application) : AndroidViewModel(applicatio
         var score = 0
         if (selfProfile.name.isNotBlank()) score += 20
         if (selfProfile.birthDate.isNotBlank()) score += 15
-        if (selfProfile.gender.isNotBlank()) score += 10
-        if (selfProfile.phone.isNotBlank()) score += 10
+        if (selfProfile.gender.isNotBlank()) score += 15
         if (selfProfile.conditions.isNotBlank()) score += 15
         if (selfProfile.allergies.isNotBlank()) score += 15
         if (selfProfile.medications.isNotBlank()) score += 10
@@ -466,6 +489,425 @@ class CareRouteViewModel(application: Application) : AndroidViewModel(applicatio
         }
 
         preferencesRepository.markLegacyMigrationCompleted()
+    }
+
+
+    fun connectCloudUser(
+        userId: String,
+        email: String,
+        displayName: String
+    ) {
+        if (userId.isBlank() || userId.startsWith("emergency_guest")) {
+            disconnectCloudUser()
+            return
+        }
+
+        if (cloudUserId == userId) return
+        cloudUserId = userId
+
+        viewModelScope.launch(Dispatchers.IO) {
+            ensureCloudUserDocument(
+                userId = userId,
+                email = email,
+                displayName = displayName
+            )
+            loadSelfProfileFromCloud(userId)
+            syncAllUserDataToCloud(userId)
+        }
+    }
+
+    fun disconnectCloudUser() {
+        cloudUserId = null
+    }
+
+    fun mimicCloudFamilyMember(member: CloudFamilyMember) {
+        val memberId = member.id.ifBlank {
+            member.linkedUserUid.ifBlank { UUID.randomUUID().toString() }
+        }
+
+        val localMember = FamilyMember(
+            id = memberId,
+            name = member.name.ifBlank { member.email.ifBlank { "Family Member" } },
+            relation = member.relationship.ifBlank { "Family" },
+            birthDate = member.birthDate,
+            age = member.age,
+            gender = member.gender,
+            allergies = member.allergies,
+            medications = member.medications,
+            conditions = member.conditions,
+            notes = member.linkedUserEmail.ifBlank { member.email }
+        )
+
+        upsertFamilyMember(localMember)
+        selectPerson(localMember.id)
+    }
+
+    private fun activeCloudUid(): String? {
+        return cloudUserId ?: auth.currentUser?.uid
+    }
+
+    private suspend fun safeCloudWrite(action: suspend () -> Unit) {
+        try {
+            action()
+        } catch (_: Exception) {
+            // Local Room data remains the source of offline truth if cloud sync is temporarily unavailable.
+        }
+    }
+
+    private suspend fun ensureCloudUserDocument(
+        userId: String,
+        email: String,
+        displayName: String
+    ) = safeCloudWrite {
+        val userRef = db.collection("users").document(userId)
+        val snapshot = userRef.get().await()
+        val time = System.currentTimeMillis()
+        val cleanName = displayName.ifBlank { email.ifBlank { "User" } }
+
+        val data = if (snapshot.exists()) {
+            mapOf(
+                "uid" to userId,
+                "email" to email,
+                "name" to cleanName,
+                "lastLoginAt" to time,
+                "updatedAt" to time
+            )
+        } else {
+            mapOf(
+                "uid" to userId,
+                "email" to email,
+                "name" to cleanName,
+                "birthDate" to "",
+                "age" to "",
+                "gender" to "",
+                "height" to "",
+                "weight" to "",
+                "address" to "",
+                "allergies" to "",
+                "medications" to "",
+                "conditions" to "",
+                "emergencyContact" to "",
+                "selectedFamilyId" to "",
+                "familyCode" to "",
+                "createdAt" to time,
+                "lastLoginAt" to time,
+                "updatedAt" to time
+            )
+        }
+
+        userRef.set(data, SetOptions.merge()).await()
+    }
+
+    private suspend fun loadSelfProfileFromCloud(userId: String) = safeCloudWrite {
+        val snapshot = db.collection("users").document(userId).get().await()
+        if (!snapshot.exists()) return@safeCloudWrite
+
+        val cloudProfile = PatientProfile(
+            name = snapshot.getString("name").orEmpty().ifBlank { selfProfile.name },
+            birthDate = snapshot.getString("birthDate").orEmpty().ifBlank {
+                snapshot.getString("birthday").orEmpty().ifBlank { selfProfile.birthDate }
+            },
+            age = snapshot.getString("age").orEmpty().ifBlank { selfProfile.age },
+            gender = snapshot.getString("gender").orEmpty().ifBlank { selfProfile.gender },
+            height = snapshot.getString("height").orEmpty().ifBlank { selfProfile.height },
+            weight = snapshot.getString("weight").orEmpty().ifBlank { selfProfile.weight },
+            address = snapshot.getString("address").orEmpty().ifBlank { selfProfile.address },
+            allergies = snapshot.getString("allergies").orEmpty().ifBlank { selfProfile.allergies },
+            medications = snapshot.getString("medications").orEmpty().ifBlank { selfProfile.medications },
+            conditions = snapshot.getString("conditions").orEmpty().ifBlank { selfProfile.conditions },
+            emergencyContact = snapshot.getString("emergencyContact").orEmpty().ifBlank { selfProfile.emergencyContact }
+        )
+
+        withContext(Dispatchers.Main) {
+            selfProfile = cloudProfile
+        }
+        dao.upsertSelfProfile(cloudProfile.toEntity())
+    }
+
+    private suspend fun syncAllUserDataToCloud(userId: String) = safeCloudWrite {
+        syncSelfProfileToCloud(selfProfile, userId)
+        syncSettingsToCloud(settings, userId)
+        _familyMembers.forEach { syncFamilyMemberToCloud(it, userId) }
+        _historyRecords.forEach { syncHistoryRecordToCloud(it, userId) }
+        _importedMedicalRecords.forEach { syncImportedMedicalRecordToCloud(it, userId) }
+        dailyTipsByPerson.values.forEach { syncDailyHealthTipToCloud(it, userId) }
+        _checkupSuggestions.forEach { syncCheckupSuggestionToCloud(it, userId) }
+    }
+
+    private suspend fun syncSelfProfileToCloud(
+        profile: PatientProfile,
+        explicitUserId: String? = null
+    ) = safeCloudWrite {
+        val uid = explicitUserId ?: activeCloudUid() ?: return@safeCloudWrite
+        val user = auth.currentUser
+        val email = user?.email.orEmpty()
+        val time = System.currentTimeMillis()
+        val cleanName = profile.name.ifBlank { user?.displayName ?: email.ifBlank { "User" } }
+
+        val data = mapOf(
+            "uid" to uid,
+            "email" to email,
+            "name" to cleanName,
+            "birthDate" to profile.birthDate,
+            "age" to profile.age,
+            "gender" to profile.gender,
+            "height" to profile.height,
+            "weight" to profile.weight,
+            "address" to profile.address,
+            "allergies" to profile.allergies,
+            "medications" to profile.medications,
+            "conditions" to profile.conditions,
+            "emergencyContact" to profile.emergencyContact,
+            "updatedAt" to time
+        )
+
+        val userRef = db.collection("users").document(uid)
+        userRef.set(data, SetOptions.merge()).await()
+
+        val selectedFamilyId = userRef.get().await().getString("selectedFamilyId").orEmpty()
+        if (selectedFamilyId.isNotBlank()) {
+            db.collection("families")
+                .document(selectedFamilyId)
+                .collection("members")
+                .document(uid)
+                .set(
+                    profile.toLinkedFamilyMemberCloudMap(
+                        uid = uid,
+                        email = email,
+                        name = cleanName,
+                        updatedAt = time
+                    ),
+                    SetOptions.merge()
+                )
+                .await()
+        }
+    }
+
+    private fun PatientProfile.toLinkedFamilyMemberCloudMap(
+        uid: String,
+        email: String,
+        name: String,
+        updatedAt: Long
+    ): Map<String, Any> {
+        return mapOf(
+            "id" to uid,
+            "name" to name,
+            "email" to email,
+            "birthDate" to birthDate,
+            "age" to age,
+            "gender" to gender,
+            "height" to height,
+            "weight" to weight,
+            "address" to address,
+            "allergies" to allergies,
+            "medications" to medications,
+            "conditions" to conditions,
+            "emergencyContact" to emergencyContact,
+            "linkedUserUid" to uid,
+            "linkedUserEmail" to email,
+            "updatedAt" to updatedAt
+        )
+    }
+
+    private suspend fun syncSettingsToCloud(
+        updated: AppSettings,
+        explicitUserId: String? = null
+    ) = safeCloudWrite {
+        val uid = explicitUserId ?: activeCloudUid() ?: return@safeCloudWrite
+        db.collection("users")
+            .document(uid)
+            .collection("settings")
+            .document("default")
+            .set(
+                mapOf(
+                    "notificationsEnabled" to updated.notificationsEnabled,
+                    "darkModeEnabled" to updated.darkModeEnabled,
+                    "accentTheme" to updated.accentTheme.name,
+                    "updatedAt" to System.currentTimeMillis()
+                ),
+                SetOptions.merge()
+            )
+            .await()
+    }
+
+    private suspend fun syncFamilyMemberToCloud(
+        member: FamilyMember,
+        explicitUserId: String? = null
+    ) = safeCloudWrite {
+        val uid = explicitUserId ?: activeCloudUid() ?: return@safeCloudWrite
+        db.collection("users")
+            .document(uid)
+            .collection("familyProfiles")
+            .document(member.id)
+            .set(
+                mapOf(
+                    "id" to member.id,
+                    "name" to member.name,
+                    "relation" to member.relation,
+                    "birthDate" to member.birthDate,
+                    "age" to member.age,
+                    "gender" to member.gender,
+                    "allergies" to member.allergies,
+                    "medications" to member.medications,
+                    "conditions" to member.conditions,
+                    "notes" to member.notes,
+                    "updatedAt" to System.currentTimeMillis()
+                ),
+                SetOptions.merge()
+            )
+            .await()
+    }
+
+    private suspend fun syncHistoryRecordToCloud(
+        record: SavedCheckRecord,
+        explicitUserId: String? = null
+    ) = safeCloudWrite {
+        val uid = explicitUserId ?: activeCloudUid() ?: return@safeCloudWrite
+        db.collection("users")
+            .document(uid)
+            .collection("historyRecords")
+            .document(record.id)
+            .set(
+                mapOf(
+                    "id" to record.id,
+                    "personId" to record.personId,
+                    "personName" to record.personName,
+                    "personGroup" to record.personGroup,
+                    "bodyPart" to record.bodyPart,
+                    "symptomText" to record.symptomText,
+                    "painLevel" to record.painLevel,
+                    "urgency" to record.urgency,
+                    "careLevel" to record.careLevel,
+                    "summary" to record.summary,
+                    "mapQuery" to record.mapQuery,
+                    "createdAt" to record.createdAt,
+                    "updatedAt" to System.currentTimeMillis()
+                ),
+                SetOptions.merge()
+            )
+            .await()
+    }
+
+    private suspend fun syncImportedMedicalRecordToCloud(
+        record: ImportedMedicalRecord,
+        explicitUserId: String? = null
+    ) = safeCloudWrite {
+        val uid = explicitUserId ?: activeCloudUid() ?: return@safeCloudWrite
+        db.collection("users")
+            .document(uid)
+            .collection("importedMedicalRecords")
+            .document(record.id)
+            .set(
+                mapOf(
+                    "id" to record.id,
+                    "personId" to record.personId,
+                    "personName" to record.personName,
+                    "sourceType" to record.sourceType.name,
+                    "sourceLabel" to record.sourceLabel,
+                    "title" to record.title,
+                    "summary" to record.summary,
+                    "findings" to record.findings,
+                    "recommendedFollowUp" to record.recommendedFollowUp,
+                    "rawText" to record.rawText,
+                    "createdAt" to record.createdAt,
+                    "updatedAt" to System.currentTimeMillis()
+                ),
+                SetOptions.merge()
+            )
+            .await()
+    }
+
+    private suspend fun syncDailyHealthTipToCloud(
+        tip: DailyHealthTip,
+        explicitUserId: String? = null
+    ) = safeCloudWrite {
+        val uid = explicitUserId ?: activeCloudUid() ?: return@safeCloudWrite
+        db.collection("users")
+            .document(uid)
+            .collection("dailyHealthTips")
+            .document(tip.personId)
+            .set(
+                mapOf(
+                    "personId" to tip.personId,
+                    "title" to tip.title,
+                    "message" to tip.message,
+                    "focusArea" to tip.focusArea,
+                    "caution" to tip.caution,
+                    "generatedDate" to tip.generatedDate,
+                    "source" to tip.source,
+                    "updatedAt" to System.currentTimeMillis()
+                ),
+                SetOptions.merge()
+            )
+            .await()
+    }
+
+    private suspend fun syncCheckupSuggestionToCloud(
+        suggestion: PersonalizedCheckupSuggestion,
+        explicitUserId: String? = null
+    ) = safeCloudWrite {
+        val uid = explicitUserId ?: activeCloudUid() ?: return@safeCloudWrite
+        db.collection("users")
+            .document(uid)
+            .collection("checkupSuggestions")
+            .document(suggestion.id)
+            .set(
+                mapOf(
+                    "id" to suggestion.id,
+                    "title" to suggestion.title,
+                    "reason" to suggestion.reason,
+                    "timeframe" to suggestion.timeframe,
+                    "priority" to suggestion.priority,
+                    "personId" to suggestion.personId,
+                    "generatedDate" to suggestion.generatedDate,
+                    "updatedAt" to System.currentTimeMillis()
+                ),
+                SetOptions.merge()
+            )
+            .await()
+    }
+
+    private suspend fun deleteCloudDocument(
+        collection: String,
+        documentId: String
+    ) = safeCloudWrite {
+        val uid = activeCloudUid() ?: return@safeCloudWrite
+        db.collection("users")
+            .document(uid)
+            .collection(collection)
+            .document(documentId)
+            .delete()
+            .await()
+    }
+
+    private suspend fun deleteCloudDocumentsWherePersonId(
+        collection: String,
+        personId: String
+    ) = safeCloudWrite {
+        val uid = activeCloudUid() ?: return@safeCloudWrite
+        val snapshot = db.collection("users")
+            .document(uid)
+            .collection(collection)
+            .whereEqualTo("personId", personId)
+            .get()
+            .await()
+
+        val batch = db.batch()
+        snapshot.documents.forEach { batch.delete(it.reference) }
+        batch.commit().await()
+    }
+
+    private suspend fun clearCloudCollection(collection: String) = safeCloudWrite {
+        val uid = activeCloudUid() ?: return@safeCloudWrite
+        val snapshot = db.collection("users")
+            .document(uid)
+            .collection(collection)
+            .get()
+            .await()
+
+        val batch = db.batch()
+        snapshot.documents.forEach { batch.delete(it.reference) }
+        batch.commit().await()
     }
 
     private fun todayKey(): String {

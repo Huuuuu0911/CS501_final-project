@@ -130,7 +130,7 @@ fun AuthScreen(
                     }
 
                     Text(
-                        text = "Use an email or phone number and password. Emergency Mode is available for immediate access without an account.",
+                        text = "Use an email address and password. Emergency Mode is available for immediate access without an account.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.96f)
                     )
@@ -196,8 +196,8 @@ fun AuthScreen(
                             authViewModel.clearError()
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Email or phone") },
-                        placeholder = { Text("e.g. alex@email.com or 6175551234") },
+                        label = { Text("Email") },
+                        placeholder = { Text("e.g. alex@email.com") },
                         shape = RoundedCornerShape(18.dp),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
@@ -435,7 +435,7 @@ fun AuthScreen(
             }
 
             Text(
-                text = "Prototype note: this version stores accounts on the device for now. Real cross-device login should be connected to a backend auth service next.",
+                text = "Accounts and profile data sync through Firebase so your CareRoute information can follow you across devices.",
                 style = MaterialTheme.typography.bodySmall,
                 color = Color(0xFF667085),
                 textAlign = TextAlign.Center,

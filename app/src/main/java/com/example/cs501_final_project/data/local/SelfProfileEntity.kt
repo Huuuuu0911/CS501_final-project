@@ -11,7 +11,6 @@ data class SelfProfileEntity(
     val birthDate: String = "",
     val age: String = "",
     val gender: String = "",
-    val phone: String = "",
     val height: String = "",
     val weight: String = "",
     val address: String = "",

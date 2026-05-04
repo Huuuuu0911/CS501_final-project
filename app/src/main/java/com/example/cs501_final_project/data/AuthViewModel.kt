@@ -50,6 +50,11 @@ class AuthViewModel : ViewModel() {
         return System.currentTimeMillis()
     }
 
+    private fun isValidEmail(value: String): Boolean {
+        val clean = value.trim()
+        return clean.contains("@") && clean.substringAfter("@").contains(".")
+    }
+
     private fun loadCurrentUser() {
         val user = auth.currentUser
 
@@ -114,6 +119,11 @@ class AuthViewModel : ViewModel() {
             return
         }
 
+        if (!isValidEmail(email)) {
+            message = "Please sign in with an email address."
+            return
+        }
+
         viewModelScope.launch {
             isLoading = true
             message = ""
@@ -169,6 +179,11 @@ class AuthViewModel : ViewModel() {
     ) {
         if (displayName.isBlank() || identifier.isBlank() || password.isBlank()) {
             message = "Please fill in all fields."
+            return
+        }
+
+        if (!isValidEmail(identifier)) {
+            message = "Please register with an email address."
             return
         }
 
@@ -257,8 +272,7 @@ class AuthViewModel : ViewModel() {
 
     fun updateCloudProfile(
         name: String,
-        birthday: String = "",
-        phone: String = ""
+        birthDate: String = ""
     ) {
         val user = auth.currentUser
 
@@ -286,8 +300,7 @@ class AuthViewModel : ViewModel() {
                     "uid" to user.uid,
                     "email" to (user.email ?: ""),
                     "name" to cleanName,
-                    "birthday" to birthday.trim(),
-                    "phone" to phone.trim(),
+                    "birthDate" to birthDate.trim(),
                     "updatedAt" to now()
                 )
 

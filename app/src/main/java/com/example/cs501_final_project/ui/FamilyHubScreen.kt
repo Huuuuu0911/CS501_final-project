@@ -10,10 +10,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AssistChip
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -27,22 +27,31 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.cs501_final_project.data.CareRouteViewModel
 import com.example.cs501_final_project.data.remote.CloudFamilyMember
 
 @Composable
 fun FamilyHubScreen(
-    viewModel: FamilyHubViewModel = viewModel()
+    careRouteViewModel: CareRouteViewModel,
+    onAskAsMember: () -> Unit,
+    hubViewModel: FamilyHubViewModel = viewModel()
 ) {
     LaunchedEffect(Unit) {
-        viewModel.start()
+        hubViewModel.start()
     }
 
-    if (!viewModel.isSignedIn) {
-        FamilyAuthContent(viewModel = viewModel)
+    if (!hubViewModel.isSignedIn) {
+        FamilyAuthContent(viewModel = hubViewModel)
     } else {
-        FamilyHubContent(viewModel = viewModel)
+        FamilyHubContent(
+            viewModel = hubViewModel,
+            careRouteViewModel = careRouteViewModel,
+            onAskAsMember = onAskAsMember
+        )
     }
 }
 
@@ -62,11 +71,12 @@ private fun FamilyAuthContent(
     ) {
         Text(
             text = "Family Hub Login",
-            style = MaterialTheme.typography.headlineSmall
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold
         )
 
         Text(
-            text = "Sign in to sync family health data across devices.",
+            text = "Sign in with email to sync family health data across devices.",
             style = MaterialTheme.typography.bodyMedium
         )
 
@@ -81,18 +91,23 @@ private fun FamilyAuthContent(
             value = email,
             onValueChange = { email = it },
             label = { Text("Email") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
         )
 
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
             label = { Text("Password") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
+                enabled = !viewModel.isBusy,
                 onClick = {
                     viewModel.signIn(email, password)
                 }
@@ -101,6 +116,7 @@ private fun FamilyAuthContent(
             }
 
             OutlinedButton(
+                enabled = !viewModel.isBusy,
                 onClick = {
                     viewModel.signUp(email, password, name)
                 }
@@ -120,10 +136,13 @@ private fun FamilyAuthContent(
 
 @Composable
 private fun FamilyHubContent(
-    viewModel: FamilyHubViewModel
+    viewModel: FamilyHubViewModel,
+    careRouteViewModel: CareRouteViewModel,
+    onAskAsMember: () -> Unit
 ) {
     var familyName by remember { mutableStateOf("") }
-    var joinFamilyId by remember { mutableStateOf("") }
+    var joinFamilyCode by remember { mutableStateOf("") }
+    var inviteEmail by remember { mutableStateOf("") }
 
     var memberName by remember { mutableStateOf("") }
     var relationship by remember { mutableStateOf("") }
@@ -142,7 +161,8 @@ private fun FamilyHubContent(
         item {
             Text(
                 text = "Family Hub",
-                style = MaterialTheme.typography.headlineSmall
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
             )
 
             Text(
@@ -151,163 +171,210 @@ private fun FamilyHubContent(
             )
 
             if (viewModel.message.isNotBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = viewModel.message,
                     color = MaterialTheme.colorScheme.primary
                 )
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            OutlinedButton(
-                onClick = { viewModel.signOut() }
-            ) {
-                Text("Sign Out")
-            }
         }
 
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "Create a Family",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-
-                    OutlinedTextField(
-                        value = familyName,
-                        onValueChange = { familyName = it },
-                        label = { Text("Family name") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Button(
-                        onClick = {
-                            viewModel.createFamily(familyName)
-                            familyName = ""
-                        }
+        if (!viewModel.hasFamily) {
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text("Create Family")
+                        Text(
+                            text = "Create a Family",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        Text(
+                            text = "Each user can belong to one family. The creator becomes the owner and can approve join requests.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+
+                        OutlinedTextField(
+                            value = familyName,
+                            onValueChange = { familyName = it },
+                            label = { Text("Family name") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        Button(
+                            enabled = !viewModel.isBusy,
+                            onClick = {
+                                viewModel.createFamily(familyName)
+                                familyName = ""
+                            }
+                        ) {
+                            Text("Create Family")
+                        }
+                    }
+                }
+            }
+
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "Join by Family Code",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        Text(
+                            text = "Enter the 6-digit code from the family owner or invitation email.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+
+                        OutlinedTextField(
+                            value = joinFamilyCode,
+                            onValueChange = { joinFamilyCode = it.filter { c -> c.isDigit() }.take(6) },
+                            label = { Text("Family code") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        )
+
+                        Button(
+                            enabled = !viewModel.isBusy && joinFamilyCode.length == 6,
+                            onClick = {
+                                viewModel.requestToJoinFamily(joinFamilyCode)
+                                joinFamilyCode = ""
+                            }
+                        ) {
+                            Text("Send Join Request")
+                        }
                     }
                 }
             }
         }
 
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "Join an Existing Family",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-
-                    Text(
-                        text = "Ask the family owner for the Family ID.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-
-                    OutlinedTextField(
-                        value = joinFamilyId,
-                        onValueChange = { joinFamilyId = it },
-                        label = { Text("Family ID") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Button(
-                        onClick = {
-                            viewModel.requestToJoinFamily(joinFamilyId)
-                            joinFamilyId = ""
-                        }
+        viewModel.selectedFamily?.let { family ->
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text("Send Join Request")
-                    }
-                }
-            }
-        }
+                        Text(
+                            text = family.familyName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
 
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "My Families",
-                        style = MaterialTheme.typography.titleMedium
-                    )
+                        Text("Family Code: ${family.familyCode}")
+                        Text("Role: ${family.roles[viewModel.currentUserUid] ?: "member"}")
 
-                    if (viewModel.families.isEmpty()) {
-                        Text("No family yet.")
-                    } else {
-                        viewModel.families.forEach { family ->
-                            AssistChip(
-                                onClick = { viewModel.selectFamily(family) },
-                                label = {
-                                    Text(family.familyName)
-                                }
+                        if (viewModel.canManageJoinRequests) {
+                            Text(
+                                text = "You created this family, so you can approve or reject join requests.",
+                                style = MaterialTheme.typography.bodySmall
                             )
                         }
                     }
+                }
+            }
 
-                    viewModel.selectedFamily?.let { family ->
-                        Divider()
-                        Text("Selected: ${family.familyName}")
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         Text(
-                            text = "Family ID: ${family.id}",
+                            text = "Invite by Email",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        Text(
+                            text = "Any family member can invite someone. The email includes this family's 6-digit code.",
                             style = MaterialTheme.typography.bodySmall
                         )
+
+                        OutlinedTextField(
+                            value = inviteEmail,
+                            onValueChange = { inviteEmail = it },
+                            label = { Text("Email address") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                        )
+
+                        Button(
+                            enabled = !viewModel.isBusy && inviteEmail.isNotBlank(),
+                            onClick = {
+                                viewModel.inviteByEmail(inviteEmail)
+                                inviteEmail = ""
+                            }
+                        ) {
+                            Text("Send Invite Email")
+                        }
                     }
                 }
             }
-        }
 
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "Add Family Member",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-
-                    OutlinedTextField(
-                        value = memberName,
-                        onValueChange = { memberName = it },
-                        label = { Text("Name") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = relationship,
-                        onValueChange = { relationship = it },
-                        label = { Text("Relationship, for example Dad") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = birthday,
-                        onValueChange = { birthday = it },
-                        label = { Text("Birthday, for example 05/20/1975") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Button(
-                        onClick = {
-                            viewModel.addMember(memberName, relationship, birthday)
-                            memberName = ""
-                            relationship = ""
-                            birthday = ""
-                        }
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text("Add Member")
+                        Text(
+                            text = "Add Offline Family Profile",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        Text(
+                            text = "Use this for children or relatives who do not have their own account yet.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+
+                        OutlinedTextField(
+                            value = memberName,
+                            onValueChange = { memberName = it },
+                            label = { Text("Name") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        OutlinedTextField(
+                            value = relationship,
+                            onValueChange = { relationship = it },
+                            label = { Text("Relationship, for example Dad") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        OutlinedTextField(
+                            value = birthday,
+                            onValueChange = { birthday = it },
+                            label = { Text("Birth date, for example 05/20/1975") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        Button(
+                            enabled = !viewModel.isBusy && memberName.isNotBlank(),
+                            onClick = {
+                                viewModel.addMember(memberName, relationship, birthday)
+                                memberName = ""
+                                relationship = ""
+                                birthday = ""
+                            }
+                        ) {
+                            Text("Add Profile")
+                        }
                     }
                 }
             }
@@ -316,91 +383,118 @@ private fun FamilyHubContent(
         item {
             Text(
                 text = "Family Members",
-                style = MaterialTheme.typography.titleMedium
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
             )
+        }
+
+        if (viewModel.members.isEmpty()) {
+            item {
+                Text("No family members yet.")
+            }
         }
 
         items(viewModel.members) { member ->
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = member.name,
-                        style = MaterialTheme.typography.titleMedium
+                        text = member.name.ifBlank { "Family Member" },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
                     )
 
                     Text("Relationship: ${member.relationship.ifBlank { "Not set" }}")
-                    Text("Birthday: ${member.birthday.ifBlank { "Not set" }}")
+                    Text("Email: ${(member.linkedUserEmail.ifBlank { member.email }).ifBlank { "Offline profile" }}")
+                    Text("Birth Date: ${member.birthDate.ifBlank { "Not set" }}")
 
-                    Button(
-                        onClick = {
-                            selectedMember = member
-                        }
-                    ) {
-                        Text("Select for Record")
-                    }
-                }
-            }
-        }
-
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "Add Quick Symptom Record",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-
-                    Text(
-                        text = selectedMember?.name ?: "No member selected",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-
-                    OutlinedTextField(
-                        value = symptoms,
-                        onValueChange = { symptoms = it },
-                        label = { Text("Symptoms") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Text("Pain Level: ${painLevel.toInt()}")
-
-                    Slider(
-                        value = painLevel,
-                        onValueChange = { painLevel = it },
-                        valueRange = 0f..10f
-                    )
-
-                    Button(
-                        onClick = {
-                            selectedMember?.let { member ->
-                                viewModel.addQuickRecord(
-                                    member = member,
-                                    symptoms = symptoms,
-                                    pain = painLevel.toInt()
-                                )
-                                symptoms = ""
-                                painLevel = 3f
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                selectedMember = member
                             }
-                        },
-                        enabled = selectedMember != null
-                    ) {
-                        Text("Save Record")
+                        ) {
+                            Text("Record Symptom")
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                careRouteViewModel.mimicCloudFamilyMember(member)
+                                viewModel.confirmMimic(member.name.ifBlank { "Family Member" })
+                                onAskAsMember()
+                            }
+                        ) {
+                            Text("Mimic & Ask")
+                        }
                     }
                 }
             }
         }
 
-        item {
-            Text(
-                text = "Recent Family Records",
-                style = MaterialTheme.typography.titleMedium
-            )
+        viewModel.selectedFamily?.let {
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "Add Quick Symptom Record",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        Text(
+                            text = selectedMember?.name ?: "No member selected",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+
+                        OutlinedTextField(
+                            value = symptoms,
+                            onValueChange = { symptoms = it },
+                            label = { Text("Symptoms") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Text("Pain Level: ${painLevel.toInt()}")
+
+                        Slider(
+                            value = painLevel,
+                            onValueChange = { painLevel = it },
+                            valueRange = 0f..10f
+                        )
+
+                        Button(
+                            enabled = !viewModel.isBusy && selectedMember != null && symptoms.isNotBlank(),
+                            onClick = {
+                                selectedMember?.let { member ->
+                                    viewModel.addQuickRecord(
+                                        member = member,
+                                        symptoms = symptoms,
+                                        pain = painLevel.toInt()
+                                    )
+                                    symptoms = ""
+                                    painLevel = 3f
+                                }
+                            }
+                        ) {
+                            Text("Save Record")
+                        }
+                    }
+                }
+            }
+        }
+
+        if (viewModel.records.isNotEmpty()) {
+            item {
+                Text(
+                    text = "Recent Family Records",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
 
         items(viewModel.records) { record ->
@@ -415,7 +509,8 @@ private fun FamilyHubContent(
                 ) {
                     Text(
                         text = record.title,
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
                     )
 
                     Text("Member: $memberNameForRecord")
@@ -426,43 +521,57 @@ private fun FamilyHubContent(
             }
         }
 
-        item {
-            if (viewModel.joinRequests.isNotEmpty()) {
+        if (viewModel.canManageJoinRequests) {
+            item {
+                HorizontalDivider()
                 Text(
                     text = "Pending Join Requests",
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(top = 8.dp)
                 )
+
+                if (viewModel.joinRequests.isEmpty()) {
+                    Text("No pending requests.")
+                }
             }
-        }
 
-        items(viewModel.joinRequests) { request ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text("Request from: ${request.requesterName}")
-                    Text("Email: ${request.requesterEmail}")
+            items(viewModel.joinRequests) { request ->
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("Request from: ${request.requesterName}")
+                        Text("Email: ${request.requesterEmail}")
+                        Text("Family Code: ${request.familyCode}")
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = {
-                                viewModel.approveRequest(request)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                enabled = !viewModel.isBusy,
+                                onClick = {
+                                    viewModel.approveRequest(request)
+                                }
+                            ) {
+                                Text("Approve")
                             }
-                        ) {
-                            Text("Approve")
-                        }
 
-                        OutlinedButton(
-                            onClick = {
-                                viewModel.rejectRequest(request)
+                            OutlinedButton(
+                                enabled = !viewModel.isBusy,
+                                onClick = {
+                                    viewModel.rejectRequest(request)
+                                }
+                            ) {
+                                Text("Reject")
                             }
-                        ) {
-                            Text("Reject")
                         }
                     }
                 }
             }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(12.dp))
         }
     }
 }
